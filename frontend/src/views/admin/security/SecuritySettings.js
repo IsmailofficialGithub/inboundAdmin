@@ -48,7 +48,7 @@ import {
 } from '@coreui/icons'
 import { getAuthToken } from '../../../utils/cookies'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3020/api'
 
 const SecuritySettings = () => {
   const [activeTab, setActiveTab] = useState('webhooks')

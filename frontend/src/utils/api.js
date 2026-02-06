@@ -6,7 +6,7 @@
 import toast from 'react-hot-toast'
 import { getAuthToken, clearAuthToken } from './cookies'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3020/api'
 
 /**
  * Make an authenticated API request

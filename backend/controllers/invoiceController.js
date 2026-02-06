@@ -725,7 +725,7 @@ const processPendingInvoiceEmails = async () => {
         const companyName = invoiceSettings?.company_name || 'Outbond'
 
         // Generate invoice URL (adjust based on your frontend URL structure)
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3010'
         const invoiceUrl = `${frontendUrl}/invoices/${invoice.id}`
 
         // Format dates
@@ -885,7 +885,7 @@ const sendInvoiceEmail = async (req, res) => {
     const companyName = invoiceSettings?.company_name || 'Outbond'
 
     // Generate invoice URL
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3010'
     const invoiceUrl = `${frontendUrl}/invoices/${invoice.id}`
 
     // Format dates
