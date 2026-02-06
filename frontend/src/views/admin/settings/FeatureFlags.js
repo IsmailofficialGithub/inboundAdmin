@@ -25,7 +25,6 @@ import {
   CFormTextarea,
   CFormCheck,
   CAlert,
-  CSwitch,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilPlus, cilPencil, cilTrash, cilToggleOn, cilToggleOff } from '@coreui/icons'

@@ -29,7 +29,6 @@ import {
   CForm,
   CListGroup,
   CListGroupItem,
-  CTabs,
   CNav,
   CNavItem,
   CNavLink,
@@ -177,10 +176,24 @@ const PackagesManagement = () => {
   const openDetailModal = async (pkg) => {
     try {
       const data = await packagesAPI.getById(pkg.id)
-      setSelectedPackage(data.package)
+      // Handle both response formats: { package: {...} } or direct package object
+      const packageData = data.package || data
+      if (!packageData) {
+        toast.error('Package data not found')
+        return
+      }
+      // Ensure features and variables are arrays
+      const packageWithDefaults = {
+        ...packageData,
+        features: packageData.features || [],
+        variables: packageData.variables || [],
+      }
+      console.log('Setting selected package:', packageWithDefaults)
+      setSelectedPackage(packageWithDefaults)
       setDetailModal(true)
       setActiveTab('features')
     } catch (err) {
+      console.error('Error fetching package details:', err)
       toast.error(err.message)
     }
   }
@@ -512,22 +525,39 @@ const PackagesManagement = () => {
           </CModalTitle>
         </CModalHeader>
         <CModalBody>
-          {selectedPackage && (
+          {selectedPackage ? (
             <>
-              <CTabs activeTab={activeTab} onActiveTabChange={setActiveTab}>
-                <CNav variant="tabs">
-                  <CNavItem>
-                    <CNavLink data-tab="features">Features</CNavLink>
-                  </CNavItem>
-                  <CNavItem>
-                    <CNavLink data-tab="variables">Variables</CNavLink>
-                  </CNavItem>
-                  <CNavItem>
-                    <CNavLink data-tab="preview">Preview</CNavLink>
-                  </CNavItem>
-                </CNav>
-                <CTabContent>
-                  <CTabPane data-tab="features">
+              <CNav variant="tabs" className="mb-3">
+                <CNavItem>
+                  <CNavLink
+                    active={activeTab === 'features'}
+                    onClick={() => setActiveTab('features')}
+                    href="#"
+                  >
+                    Features
+                  </CNavLink>
+                </CNavItem>
+                <CNavItem>
+                  <CNavLink
+                    active={activeTab === 'variables'}
+                    onClick={() => setActiveTab('variables')}
+                    href="#"
+                  >
+                    Variables
+                  </CNavLink>
+                </CNavItem>
+                <CNavItem>
+                  <CNavLink
+                    active={activeTab === 'preview'}
+                    onClick={() => setActiveTab('preview')}
+                    href="#"
+                  >
+                    Preview
+                  </CNavLink>
+                </CNavItem>
+              </CNav>
+              <CTabContent>
+                <CTabPane visible={activeTab === 'features'}>
                     <div className="d-flex justify-content-between align-items-center mb-3">
                       <h6>Package Features</h6>
                       <CButton
@@ -584,8 +614,8 @@ const PackagesManagement = () => {
                         </CListGroupItem>
                       )}
                     </CListGroup>
-                  </CTabPane>
-                  <CTabPane data-tab="variables">
+                </CTabPane>
+                <CTabPane visible={activeTab === 'variables'}>
                     <div className="d-flex justify-content-between align-items-center mb-3">
                       <h6>Package Variables</h6>
                       <CButton
@@ -635,8 +665,8 @@ const PackagesManagement = () => {
                         </CListGroupItem>
                       )}
                     </CListGroup>
-                  </CTabPane>
-                  <CTabPane data-tab="preview">
+                </CTabPane>
+                <CTabPane visible={activeTab === 'preview'}>
                     <h6>Package Preview</h6>
                     <CCard>
                       <CCardBody>
@@ -660,10 +690,14 @@ const PackagesManagement = () => {
                         </ul>
                       </CCardBody>
                     </CCard>
-                  </CTabPane>
-                </CTabContent>
-              </CTabs>
+                </CTabPane>
+              </CTabContent>
             </>
+          ) : (
+            <div className="text-center py-4">
+              <CSpinner color="primary" />
+              <div className="mt-2 text-body-secondary">Loading package details...</div>
+            </div>
           )}
         </CModalBody>
         <CModalFooter>

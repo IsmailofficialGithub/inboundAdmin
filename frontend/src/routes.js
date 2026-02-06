@@ -8,6 +8,7 @@ const Profile = React.lazy(() => import('./views/admin/profile/Profile'))
 const UsersList = React.lazy(() => import('./views/admin/users/UsersList'))
 const UserDetail = React.lazy(() => import('./views/admin/users/UserDetail'))
 const ActivityLog = React.lazy(() => import('./views/admin/activity/ActivityLog'))
+const SecurityEvents = React.lazy(() => import('./views/admin/security/SecurityEvents'))
 
 // Voice Agents
 const VoiceAgentsList = React.lazy(() => import('./views/admin/voice-agents/VoiceAgentsList'))
@@ -113,6 +114,7 @@ const routes = [
   { path: 'users/list', name: 'All Users', element: UsersList },
   { path: 'users/:id', name: 'User Detail', element: UserDetail },
   { path: 'activity-log', name: 'Activity Log', element: ActivityLog },
+  { path: 'security-events', name: 'Security Events', element: SecurityEvents, requiredRoles: ['super_admin', 'support'] },
 
   // Voice Agents
   { path: 'voice-agents', name: 'Voice Agents', element: VoiceAgentsList, exact: true },
