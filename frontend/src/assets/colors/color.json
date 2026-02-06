@@ -1,0 +1,15 @@
+{
+
+"colors": {
+    "primary": "#3086FF",
+  "secondary": "#000B27",
+  "tertiary": "#141D3A",
+    "quaternary": "#0D1328",
+    "quinary": "#1D284F",
+    "senary": "#2D3A65",
+    "septenary": "#3D4C81",
+    "octonary": "#4D5E9D",
+    "nonary": "#5D70B9",
+    "denary": "#6D82D5"
+  }
+}

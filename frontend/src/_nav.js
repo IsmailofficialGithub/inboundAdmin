@@ -22,6 +22,12 @@ import {
   cilPhone,
   cilDollar,
   cilCreditCard,
+  cilTask,
+  cilToggleOn,
+  cilWarning,
+  cilCheckCircle,
+  cilChart,
+  cilCloudDownload,
 } from '@coreui/icons'
 import { CNavGroup, CNavItem, CNavTitle } from '@coreui/react'
 
@@ -45,7 +51,6 @@ const getNavItems = (rolePrefix = 'admin') => {
     {
       component: CNavGroup,
       name: 'Users',
-      to: `${prefix}/users`,
       icon: <CIcon icon={cilPeople} customClassName="nav-icon" />,
       items: [
         {
@@ -53,14 +58,17 @@ const getNavItems = (rolePrefix = 'admin') => {
           name: 'All Users',
           to: `${prefix}/users/list`,
         },
+        {
+          component: CNavItem,
+          name: 'Consumer',
+          to: `${prefix}/users/list?tab=consumer`,
+        },
+        {
+          component: CNavItem,
+          name: 'Admin',
+          to: `${prefix}/users/list?tab=admin`,
+        },
       ],
-    },
-    {
-      component: CNavItem,
-      name: 'Admins',
-      to: `${prefix}/admins`,
-      icon: <CIcon icon={cilShieldAlt} customClassName="nav-icon" />,
-      // Only show to super_admin (handled by ProtectedRoute)
     },
     {
       component: CNavItem,
@@ -119,14 +127,82 @@ const getNavItems = (rolePrefix = 'admin') => {
       ],
     },
     {
+      component: CNavGroup,
+      name: 'Billing & Invoices',
+      icon: <CIcon icon={cilDollar} customClassName="nav-icon" />,
+      items: [
+        {
+          component: CNavItem,
+          name: 'Invoices',
+          to: `${prefix}/billing/invoices`,
+        },
+        {
+          component: CNavItem,
+          name: 'Payment History',
+          to: `${prefix}/billing/payments`,
+        },
+        {
+          component: CNavItem,
+          name: 'Coupons',
+          to: `${prefix}/billing/coupons`,
+        },
+        {
+          component: CNavItem,
+          name: 'Invoice Settings',
+          to: `${prefix}/billing/settings`,
+        },
+        {
+          component: CNavItem,
+          name: 'Package Management',
+          to: `${prefix}/billing/packages`,
+        },
+      ],
+    },
+    {
       component: CNavItem,
       name: 'Inbound Numbers',
       to: `${prefix}/inbound-numbers`,
       icon: <CIcon icon={cilPhone} customClassName="nav-icon" />,
     },
     {
+      component: CNavItem,
+      name: 'Reports & Exports',
+      to: `${prefix}/reports`,
+      icon: <CIcon icon={cilChart} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavTitle,
+      name: 'Support & Operations',
+    },
+    {
+      component: CNavItem,
+      name: 'Support Tickets',
+      to: `${prefix}/support/tickets`,
+      icon: <CIcon icon={cilTask} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavItem,
+      name: 'KYC Moderation',
+      to: `${prefix}/kyc`,
+      icon: <CIcon icon={cilCheckCircle} customClassName="nav-icon" />,
+    },
+    {
       component: CNavTitle,
       name: 'System',
+    },
+    {
+      component: CNavItem,
+      name: 'Feature Flags',
+      to: `${prefix}/settings/feature-flags`,
+      icon: <CIcon icon={cilToggleOn} customClassName="nav-icon" />,
+      // Only show to super_admin (handled by ProtectedRoute)
+    },
+    {
+      component: CNavItem,
+      name: 'System Settings',
+      to: `${prefix}/settings/system`,
+      icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+      // Only show to super_admin (handled by ProtectedRoute)
     },
     {
       component: CNavItem,

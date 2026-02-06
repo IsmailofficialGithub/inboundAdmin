@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CButton, CCard, CCardBody, CCardHeader, CCol, CRow,
@@ -7,11 +7,12 @@ import {
   CInputGroup, CInputGroupText,
   CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter,
   CForm, CFormLabel, CFormSelect, CFormTextarea,
+  CListGroup, CListGroupItem,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilSearch, cilDollar, cilPlus } from '@coreui/icons'
 import { useAuth } from '../../../contexts/AuthContext'
-import { creditsAPI } from '../../../utils/api'
+import { creditsAPI, usersAPI } from '../../../utils/api'
 
 const CreditsList = () => {
   const navigate = useNavigate()
@@ -33,8 +34,15 @@ const CreditsList = () => {
   const [adjustModal, setAdjustModal] = useState(false)
   const [adjustLoading, setAdjustLoading] = useState(false)
   const [adjustForm, setAdjustForm] = useState({
-    user_id: '', amount: '', transaction_type: 'adjustment', description: '',
+    user_id: '', user_email: '', amount: '', transaction_type: 'adjustment', description: '',
   })
+  
+  // User search for modal
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [userSearchResults, setUserSearchResults] = useState([])
+  const [userSearchLoading, setUserSearchLoading] = useState(false)
+  const [showUserSearch, setShowUserSearch] = useState(false)
+  const searchTimeoutRef = useRef(null)
 
   const fetchCredits = useCallback(async () => {
     setLoading(true)
@@ -60,9 +68,75 @@ const CreditsList = () => {
 
   useEffect(() => { fetchCredits() }, [fetchCredits])
 
-  const openAdjustModal = (userId) => {
-    setAdjustForm({ user_id: userId || '', amount: '', transaction_type: 'adjustment', description: '' })
+  // Debounced user search
+  const searchUsers = useCallback(async (query) => {
+    if (query.length < 2) {
+      setUserSearchResults([])
+      return
+    }
+
+    setUserSearchLoading(true)
+    try {
+      const data = await usersAPI.list({ 
+        search: query, 
+        limit: 10,
+        page: 0 
+      })
+      // Filter to only show consumers
+      const consumers = (data.users || []).filter(user => user.role === 'consumer')
+      setUserSearchResults(consumers)
+    } catch (err) {
+      console.error('User search error:', err)
+      setUserSearchResults([])
+    } finally {
+      setUserSearchLoading(false)
+    }
+  }, [])
+
+  // Handle user search input with debouncing
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    if (userSearchQuery.length >= 2) {
+      searchTimeoutRef.current = setTimeout(() => {
+        searchUsers(userSearchQuery)
+      }, 300) // 300ms debounce
+    } else {
+      setUserSearchResults([])
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [userSearchQuery, searchUsers])
+
+  const openAdjustModal = (userId, userEmail) => {
+    setAdjustForm({ 
+      user_id: userId || '', 
+      user_email: userEmail || '', 
+      amount: '', 
+      transaction_type: 'adjustment', 
+      description: '' 
+    })
+    setUserSearchQuery('')
+    setUserSearchResults([])
+    setShowUserSearch(!userId) // Show search if no user_id provided
     setAdjustModal(true)
+  }
+
+  const selectUser = (user) => {
+    setAdjustForm({
+      ...adjustForm,
+      user_id: user.id,
+      user_email: user.email || '',
+    })
+    setUserSearchQuery('')
+    setUserSearchResults([])
+    setShowUserSearch(false)
   }
 
   const handleAdjust = async (e) => {
@@ -171,7 +245,7 @@ const CreditsList = () => {
                             {canAdjust && (
                               <CTableDataCell>
                                 <CButton color="primary" size="sm" variant="ghost"
-                                  onClick={() => openAdjustModal(c.user_id)}>
+                                  onClick={() => openAdjustModal(c.user_id, c.email)}>
                                   Adjust
                                 </CButton>
                                 <CButton color="info" size="sm" variant="ghost"
@@ -209,11 +283,84 @@ const CreditsList = () => {
         <CModalHeader><CModalTitle>Adjust Credits</CModalTitle></CModalHeader>
         <CForm onSubmit={handleAdjust}>
           <CModalBody>
+            {showUserSearch && !adjustForm.user_id && (
+              <div className="mb-3">
+                <CFormLabel>Search User <span className="text-danger">*</span></CFormLabel>
+                <CInputGroup>
+                  <CInputGroupText><CIcon icon={cilSearch} /></CInputGroupText>
+                  <CFormInput
+                    type="text"
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    placeholder="Search by email, name, or phone (min 2 characters)..."
+                    autoFocus
+                  />
+                </CInputGroup>
+                {userSearchQuery.length > 0 && userSearchQuery.length < 2 && (
+                  <div className="form-text text-warning">
+                    Please enter at least 2 characters to search.
+                  </div>
+                )}
+                {userSearchLoading && (
+                  <div className="mt-2">
+                    <CSpinner size="sm" className="me-2" />
+                    <span className="text-body-secondary small">Searching...</span>
+                  </div>
+                )}
+                {userSearchResults.length > 0 && (
+                  <div className="mt-2">
+                    <CListGroup>
+                      {userSearchResults.map((user) => (
+                        <CListGroupItem
+                          key={user.id}
+                          action
+                          onClick={() => selectUser(user)}
+                          style={{ cursor: 'pointer' }}
+                          className="d-flex justify-content-between align-items-start"
+                        >
+                          <div className="ms-2 me-auto">
+                            <div className="fw-bold">{user.email || 'No email'}</div>
+                            <div className="text-body-secondary small">
+                              {[user.first_name, user.last_name].filter(Boolean).join(' ') || 'No name'}
+                              {user.phone && ` • ${user.phone}`}
+                            </div>
+                          </div>
+                        </CListGroupItem>
+                      ))}
+                    </CListGroup>
+                  </div>
+                )}
+                {userSearchQuery.length >= 2 && !userSearchLoading && userSearchResults.length === 0 && (
+                  <div className="form-text text-body-secondary mt-2">
+                    No consumers found matching your search.
+                  </div>
+                )}
+              </div>
+            )}
             <div className="mb-3">
               <CFormLabel>User ID <span className="text-danger">*</span></CFormLabel>
-              <CFormInput value={adjustForm.user_id}
-                onChange={(e) => setAdjustForm({ ...adjustForm, user_id: e.target.value })}
-                placeholder="UUID of the user" required />
+              <CFormInput 
+                value={adjustForm.user_id}
+                disabled
+                readOnly
+                placeholder="UUID of the user" 
+                required 
+              />
+              {!adjustForm.user_id && !showUserSearch && (
+                <div className="form-text text-warning">
+                  Please search and select a user above.
+                </div>
+              )}
+            </div>
+            <div className="mb-3">
+              <CFormLabel>Email</CFormLabel>
+              <CFormInput 
+                type="email"
+                value={adjustForm.user_email || ''}
+                disabled
+                readOnly
+                placeholder="User email" 
+              />
             </div>
             <div className="mb-3">
               <CFormLabel>Amount <span className="text-danger">*</span></CFormLabel>
@@ -239,8 +386,13 @@ const CreditsList = () => {
             </div>
           </CModalBody>
           <CModalFooter>
-            <CButton color="secondary" onClick={() => setAdjustModal(false)}>Cancel</CButton>
-            <CButton type="submit" color="primary" disabled={adjustLoading}>
+            <CButton color="secondary" onClick={() => {
+              setAdjustModal(false)
+              setUserSearchQuery('')
+              setUserSearchResults([])
+              setShowUserSearch(false)
+            }}>Cancel</CButton>
+            <CButton type="submit" color="primary" disabled={adjustLoading || !adjustForm.user_id}>
               {adjustLoading ? <><CSpinner size="sm" className="me-1" /> Processing...</> : 'Apply Adjustment'}
             </CButton>
           </CModalFooter>

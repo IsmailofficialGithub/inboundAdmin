@@ -8,7 +8,6 @@ const Profile = React.lazy(() => import('./views/admin/profile/Profile'))
 const UsersList = React.lazy(() => import('./views/admin/users/UsersList'))
 const UserDetail = React.lazy(() => import('./views/admin/users/UserDetail'))
 const ActivityLog = React.lazy(() => import('./views/admin/activity/ActivityLog'))
-const AdminsList = React.lazy(() => import('./views/admin/admins/AdminsList'))
 
 // Voice Agents
 const VoiceAgentsList = React.lazy(() => import('./views/admin/voice-agents/VoiceAgentsList'))
@@ -26,9 +25,27 @@ const TransactionsList = React.lazy(() => import('./views/admin/credits/Transact
 const SubscriptionsList = React.lazy(() => import('./views/admin/subscriptions/SubscriptionsList'))
 const PackagesList = React.lazy(() => import('./views/admin/subscriptions/PackagesList'))
 
+// Billing & Invoices
+const InvoicesList = React.lazy(() => import('./views/admin/billing/InvoicesList'))
+const InvoiceDetail = React.lazy(() => import('./views/admin/billing/InvoiceDetail'))
+const PaymentHistory = React.lazy(() => import('./views/admin/billing/PaymentHistory'))
+const CouponsList = React.lazy(() => import('./views/admin/billing/CouponsList'))
+const InvoiceSettings = React.lazy(() => import('./views/admin/billing/InvoiceSettings'))
+const PackagesManagement = React.lazy(() => import('./views/admin/billing/PackagesManagement'))
+
 // Inbound Numbers
 const InboundNumbersList = React.lazy(() => import('./views/admin/inbound-numbers/InboundNumbersList'))
 const InboundNumberDetail = React.lazy(() => import('./views/admin/inbound-numbers/InboundNumberDetail'))
+
+// Support & Operations
+const TicketsList = React.lazy(() => import('./views/admin/support/TicketsList'))
+const TicketDetail = React.lazy(() => import('./views/admin/support/TicketDetail'))
+const FeatureFlags = React.lazy(() => import('./views/admin/settings/FeatureFlags'))
+const SystemSettings = React.lazy(() => import('./views/admin/settings/SystemSettings'))
+const KYCModeration = React.lazy(() => import('./views/admin/kyc/KYCModeration'))
+
+// Reports
+const Reports = React.lazy(() => import('./views/admin/reports/Reports'))
 
 // ============================================================
 // ORIGINAL TEMPLATE PAGES (kept, not removed)
@@ -95,7 +112,6 @@ const routes = [
   { path: 'users', name: 'Users', element: UsersList, exact: true },
   { path: 'users/list', name: 'All Users', element: UsersList },
   { path: 'users/:id', name: 'User Detail', element: UserDetail },
-  { path: 'admins', name: 'Admins', element: AdminsList, requiredRoles: ['super_admin'] },
   { path: 'activity-log', name: 'Activity Log', element: ActivityLog },
 
   // Voice Agents
@@ -114,9 +130,27 @@ const routes = [
   { path: 'subscriptions', name: 'Subscriptions', element: SubscriptionsList, exact: true },
   { path: 'packages', name: 'Packages', element: PackagesList },
 
+  // Billing & Invoices
+  { path: 'billing/invoices', name: 'Invoices', element: InvoicesList, exact: true },
+  { path: 'billing/invoices/:id', name: 'Invoice Detail', element: InvoiceDetail },
+  { path: 'billing/payments', name: 'Payment History', element: PaymentHistory },
+  { path: 'billing/coupons', name: 'Coupons', element: CouponsList },
+  { path: 'billing/settings', name: 'Invoice Settings', element: InvoiceSettings, requiredRoles: ['super_admin', 'finance'] },
+  { path: 'billing/packages', name: 'Package Management', element: PackagesManagement, requiredRoles: ['super_admin', 'finance'] },
+
   // Inbound Numbers
   { path: 'inbound-numbers', name: 'Inbound Numbers', element: InboundNumbersList, exact: true },
   { path: 'inbound-numbers/:id', name: 'Number Detail', element: InboundNumberDetail },
+
+  // Support & Operations
+  { path: 'support/tickets', name: 'Support Tickets', element: TicketsList, exact: true },
+  { path: 'support/tickets/:id', name: 'Ticket Detail', element: TicketDetail },
+  { path: 'settings/feature-flags', name: 'Feature Flags', element: FeatureFlags, requiredRoles: ['super_admin'] },
+  { path: 'settings/system', name: 'System Settings', element: SystemSettings, requiredRoles: ['super_admin'] },
+  { path: 'kyc', name: 'KYC Moderation', element: KYCModeration, requiredRoles: ['super_admin', 'support', 'ops'] },
+
+  // Reports & Exports
+  { path: 'reports', name: 'Reports & Exports', element: Reports },
 
   // ============================================================
   // ORIGINAL TEMPLATE ROUTES (kept for reference, still accessible)

@@ -51,8 +51,10 @@ export const AppSidebarNav = ({ items }) => {
   const navGroup = (item, index) => {
     const { component, name, icon, items, to, ...rest } = item
     const Component = component
+    // Remove 'to' from rest to prevent CNavGroup from being a link
+    const { to: _, ...groupProps } = rest
     return (
-      <Component compact as="div" key={index} toggler={navLink(name, icon)} {...rest}>
+      <Component compact as="div" key={index} toggler={navLink(name, icon)} {...groupProps}>
         {items?.map((item, index) =>
           item.items ? navGroup(item, index) : navItem(item, index, true),
         )}

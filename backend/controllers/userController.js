@@ -70,7 +70,20 @@ const createUser = async (req, res) => {
 
     if (existingUser) {
       // User already exists in auth.users
-      // Check if they have a profile
+      // Check if they are already an admin
+      const { data: existingAdminProfile } = await supabaseAdmin
+        .from('admin_profiles')
+        .select('id')
+        .eq('id', existingUser.id)
+        .single()
+
+      if (existingAdminProfile) {
+        return res.status(409).json({ 
+          error: 'This email is already registered as an admin user. Cannot create consumer profile for admin users.' 
+        })
+      }
+
+      // Check if they already have a consumer profile
       const { data: existingProfile } = await supabaseAdmin
         .from('user_profiles')
         .select('id')
@@ -278,16 +291,56 @@ const getUsers = async (req, res) => {
       return res.status(400).json({ error: error.message })
     }
 
-    // Fetch emails from auth.users for each user and check if they are super admins
+    // Fetch emails from auth.users for each user and check if they are admins
     const usersWithEmail = await Promise.all(
       (data || []).map(async (user) => {
         try {
           const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id)
+          
+          // Check if user is an admin and get their role
+          const { data: adminProfile } = await supabaseAdmin
+            .from('admin_profiles')
+            .select('role')
+            .eq('id', user.id)
+            .eq('is_active', true)
+            .single()
+          
           const isSuperAdminUser = await isSuperAdmin(user.id)
-          return { ...user, email: authUser?.user?.email || null, is_super_admin: isSuperAdminUser }
+          const userRole = adminProfile ? adminProfile.role : 'consumer'
+          
+          return { 
+            ...user, 
+            email: authUser?.user?.email || null, 
+            is_super_admin: isSuperAdminUser,
+            role: userRole,
+            is_admin: !!adminProfile
+          }
         } catch {
           const isSuperAdminUser = await isSuperAdmin(user.id)
-          return { ...user, email: null, is_super_admin: isSuperAdminUser }
+          
+          // Check if user is an admin (in case of error above)
+          let userRole = 'consumer'
+          let isAdmin = false
+          try {
+            const { data: adminProfile } = await supabaseAdmin
+              .from('admin_profiles')
+              .select('role')
+              .eq('id', user.id)
+              .eq('is_active', true)
+              .single()
+            if (adminProfile) {
+              userRole = adminProfile.role
+              isAdmin = true
+            }
+          } catch {}
+          
+          return { 
+            ...user, 
+            email: null, 
+            is_super_admin: isSuperAdminUser,
+            role: userRole,
+            is_admin: isAdmin
+          }
         }
       })
     )

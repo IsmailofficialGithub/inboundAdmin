@@ -187,15 +187,90 @@ const createAdmin = async (req, res) => {
       return res.status(400).json({ error: `Invalid role. Must be one of: ${validRoles.join(', ')}` })
     }
 
-    // Create user in Supabase auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    })
+    // Check if user already exists in auth.users
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
+    const existingUser = existingUsers?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase())
 
-    if (authError) {
-      return res.status(400).json({ error: authError.message })
+    let authData
+    let isNewUser = false
+
+    if (existingUser) {
+      // User already exists in auth.users
+      // Check if they are already an admin
+      const { data: existingAdminProfile } = await supabaseAdmin
+        .from('admin_profiles')
+        .select('id')
+        .eq('id', existingUser.id)
+        .single()
+
+      if (existingAdminProfile) {
+        return res.status(409).json({ error: 'Admin with this email already exists' })
+      }
+
+      // Check if they have a consumer profile with real data
+      // We'll handle empty/auto-created profiles later
+      const { data: existingConsumerProfile } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id, first_name, last_name, phone, country_code')
+        .eq('id', existingUser.id)
+        .single()
+
+      if (existingConsumerProfile) {
+        // Check if it has user-provided data (not just system defaults)
+        const hasUserProvidedData = (existingConsumerProfile.first_name && existingConsumerProfile.first_name.trim() !== '') || 
+                                   (existingConsumerProfile.last_name && existingConsumerProfile.last_name.trim() !== '') || 
+                                   (existingConsumerProfile.phone && existingConsumerProfile.phone.trim() !== '') || 
+                                   (existingConsumerProfile.country_code && existingConsumerProfile.country_code.trim() !== '')
+
+        if (hasUserProvidedData) {
+          return res.status(409).json({ 
+            error: 'This email is already registered as a consumer user with profile data. Cannot create admin profile for existing consumer users.' 
+          })
+        }
+        // If no user-provided data, it's an empty profile - we'll delete it later
+      }
+
+      // User exists in auth but no profile or only empty profile - create the admin profile
+      authData = { user: existingUser }
+    } else {
+      // User doesn't exist - create new user
+      isNewUser = true
+
+      // Create user in Supabase auth
+      const { data: newAuthData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      })
+
+      if (authError) {
+        return res.status(400).json({ error: authError.message })
+      }
+
+      authData = newAuthData
+    }
+
+    // Check if user exists in user_profiles (might be auto-created by Supabase trigger)
+    // For new users, any profile entry is auto-created and should be deleted
+    // For existing users, we already checked for real data above, so any remaining entry is empty
+    const { data: existingConsumerProfile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('id')
+      .eq('id', authData.user.id)
+      .single()
+
+    if (existingConsumerProfile) {
+      // Delete the profile entry - it's either auto-created (new user) or empty (existing user)
+      // We already validated that existing users don't have real data above
+      const { error: deleteError } = await supabaseAdmin
+        .from('user_profiles')
+        .delete()
+        .eq('id', authData.user.id)
+
+      if (deleteError) {
+        console.error('Failed to delete user_profiles entry:', deleteError)
+        // Continue anyway - the database trigger will handle it if there's a real conflict
+      }
     }
 
     // Create admin profile
@@ -209,8 +284,10 @@ const createAdmin = async (req, res) => {
     })
 
     if (profileError) {
-      // Rollback: delete the auth user if profile creation fails
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+      // Rollback: delete the auth user if profile creation fails (only for new users)
+      if (isNewUser) {
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+      }
       return res.status(400).json({ error: profileError.message })
     }
 

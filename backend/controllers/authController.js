@@ -1,5 +1,6 @@
 const { supabase, supabaseAdmin } = require('../config/supabase')
 const { logAdminActivity } = require('../utils/logger')
+const { detectFailedLoginFlood } = require('../utils/abuseDetection')
 
 /**
  * POST /api/auth/login
@@ -17,6 +18,9 @@ const login = async (req, res) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
+      // Log failed login attempt and check for abuse
+      const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+      await detectFailedLoginFlood(email, clientIP, true) // true = isAdmin
       return res.status(401).json({ error: error.message })
     }
 
@@ -296,12 +300,45 @@ const forceLogout = async (req, res) => {
       return res.status(404).json({ error: 'Admin not found' })
     }
 
-    // Revoke all sessions for the admin using Supabase Admin API
-    const { error: revokeError } = await supabaseAdmin.auth.admin.signOut(adminId)
+    // Revoke all sessions for the admin
+    // Supabase doesn't have a direct "revoke all sessions" API, so we use a workaround:
+    // 1. Update user metadata to mark as force logged out (for client-side checks)
+    // 2. Update password to invalidate all existing JWTs (most reliable method)
+    
+    try {
+      // Get current user to preserve metadata
+      const { data: currentUser } = await supabaseAdmin.auth.admin.getUserById(adminId)
+      
+      // Update user metadata to mark as force logged out
+      // Frontend can check this and automatically log out the user
+      await supabaseAdmin.auth.admin.updateUserById(adminId, {
+        app_metadata: {
+          ...(currentUser?.user?.app_metadata || {}),
+          force_logout: true,
+          force_logout_at: new Date().toISOString(),
+        },
+      })
 
-    if (revokeError) {
+      // Generate a random password to invalidate all existing sessions
+      // This is the most reliable way to force logout in Supabase
+      const randomPassword = `temp_${Math.random().toString(36).slice(2, 15)}_${Date.now()}`
+      
+      // Update password - this invalidates all existing JWTs
+      const { error: passwordUpdateError } = await supabaseAdmin.auth.admin.updateUserById(adminId, {
+        password: randomPassword,
+      })
+
+      if (passwordUpdateError) {
+        console.error('Error updating password for force logout:', passwordUpdateError)
+        // Still continue - metadata update might be enough for client-side logout
+      } else {
+        // Password updated successfully - all sessions are now invalid
+        // The admin will need to reset their password to log in again
+        // You might want to send them a password reset email here
+      }
+    } catch (revokeError) {
       console.error('Force logout error:', revokeError)
-      // Continue even if there's an error - the admin might not have active sessions
+      // Continue even if there's an error - we'll still log the activity
     }
 
     // Log the force logout activity

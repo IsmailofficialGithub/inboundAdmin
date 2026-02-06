@@ -1,5 +1,237 @@
 const { supabaseAdmin } = require('../config/supabase')
 const { logAdminActivity } = require('../utils/logger')
+const { verifyProviderConnection } = require('../utils/providerVerification')
+
+/**
+ * POST /api/inbound-numbers/verify-connection
+ * Verify provider connection without creating a number
+ */
+const verifyConnection = async (req, res) => {
+  try {
+    const {
+      provider,
+      provider_account_id,
+      twilio_sid,
+      twilio_auth_token,
+      twilio_account_sid,
+      vonage_api_key,
+      vonage_api_secret,
+      vonage_application_id,
+      callhippo_api_key,
+      callhippo_account_id,
+      provider_api_key,
+      provider_api_secret,
+      provider_webhook_url,
+    } = req.body
+
+    // Validate provider
+    if (!provider) {
+      return res.status(400).json({ error: 'Provider is required' })
+    }
+
+    const validProviders = ['twilio', 'vonage', 'callhippo', 'telnyx', 'other']
+    if (!validProviders.includes(provider)) {
+      return res.status(400).json({ error: `Invalid provider. Must be one of: ${validProviders.join(', ')}` })
+    }
+
+    // Prepare credentials for verification
+    const credentials = {
+      twilio_account_sid: twilio_account_sid || provider_account_id,
+      twilio_auth_token: twilio_auth_token,
+      twilio_sid: twilio_sid,
+      vonage_api_key: vonage_api_key,
+      vonage_api_secret: vonage_api_secret,
+      vonage_application_id: vonage_application_id,
+      callhippo_api_key: callhippo_api_key,
+      callhippo_account_id: callhippo_account_id,
+      provider_api_key: provider_api_key,
+      provider_api_secret: provider_api_secret,
+      provider_webhook_url: provider_webhook_url,
+    }
+
+    // Verify provider connection
+    const verification = await verifyProviderConnection(provider, credentials)
+    
+    if (!verification.success) {
+      return res.status(400).json({
+        success: false,
+        error: verification.error,
+      })
+    }
+
+    res.json({
+      success: true,
+      message: 'Connection verified successfully',
+      account: verification.account,
+    })
+  } catch (err) {
+    console.error('Verify connection error:', err)
+    res.status(500).json({ success: false, error: 'Failed to verify connection' })
+  }
+}
+
+/**
+ * POST /api/inbound-numbers
+ * Create a new inbound number with provider verification
+ */
+const createInboundNumber = async (req, res) => {
+  try {
+    const {
+      user_id,
+      phone_number,
+      country_code = '+1',
+      phone_label,
+      call_forwarding_number,
+      provider,
+      provider_account_id,
+      twilio_sid,
+      twilio_auth_token,
+      twilio_account_sid,
+      sms_enabled = false,
+      vonage_api_key,
+      vonage_api_secret,
+      vonage_application_id,
+      callhippo_api_key,
+      callhippo_account_id,
+      provider_api_key,
+      provider_api_secret,
+      provider_webhook_url,
+      provider_config = {},
+      webhook_url,
+      assigned_to_agent_id,
+      notes,
+      metadata = {},
+    } = req.body
+
+    // Validate required fields
+    if (!user_id || !phone_number || !provider) {
+      return res.status(400).json({ error: 'user_id, phone_number, and provider are required' })
+    }
+
+    // Validate provider
+    const validProviders = ['twilio', 'vonage', 'callhippo', 'telnyx', 'other']
+    if (!validProviders.includes(provider)) {
+      return res.status(400).json({ error: `Invalid provider. Must be one of: ${validProviders.join(', ')}` })
+    }
+
+    // Validate user exists
+    try {
+      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user_id)
+      if (!authUser?.user) {
+        return res.status(404).json({ error: 'User not found' })
+      }
+    } catch (err) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    // Check if number already exists for this user (not deleted)
+    const { data: existingNumber } = await supabaseAdmin
+      .from('inbound_numbers')
+      .select('id')
+      .eq('user_id', user_id)
+      .eq('phone_number', phone_number)
+      .is('deleted_at', null)
+      .single()
+
+    if (existingNumber) {
+      return res.status(409).json({ error: 'This phone number already exists for this user' })
+    }
+
+    // Prepare credentials for verification
+    const credentials = {
+      twilio_account_sid: twilio_account_sid || provider_account_id,
+      twilio_auth_token: twilio_auth_token,
+      twilio_sid: twilio_sid,
+      vonage_api_key: vonage_api_key,
+      vonage_api_secret: vonage_api_secret,
+      vonage_application_id: vonage_application_id,
+      callhippo_api_key: callhippo_api_key,
+      callhippo_account_id: callhippo_account_id,
+      provider_api_key: provider_api_key,
+      provider_api_secret: provider_api_secret,
+      provider_webhook_url: provider_webhook_url,
+    }
+
+    // Verify provider connection
+    const verification = await verifyProviderConnection(provider, credentials)
+    if (!verification.success) {
+      return res.status(400).json({ 
+        error: `Provider connection verification failed: ${verification.error}`,
+        verificationError: verification.error,
+      })
+    }
+
+    // Prepare number data
+    const numberData = {
+      user_id,
+      phone_number,
+      country_code,
+      phone_label: phone_label || null,
+      call_forwarding_number: call_forwarding_number || null,
+      provider,
+      provider_account_id: provider_account_id || null,
+      twilio_sid: twilio_sid || null,
+      twilio_auth_token: twilio_auth_token || null,
+      twilio_account_sid: twilio_account_sid || provider_account_id || null,
+      sms_enabled: sms_enabled || false,
+      vonage_api_key: vonage_api_key || null,
+      vonage_api_secret: vonage_api_secret || null,
+      vonage_application_id: vonage_application_id || null,
+      callhippo_api_key: callhippo_api_key || null,
+      callhippo_account_id: callhippo_account_id || null,
+      provider_api_key: provider_api_key || null,
+      provider_api_secret: provider_api_secret || null,
+      provider_webhook_url: provider_webhook_url || null,
+      provider_config: typeof provider_config === 'object' ? provider_config : {},
+      status: 'active',
+      health_status: 'unknown',
+      webhook_url: webhook_url || null,
+      webhook_status: 'unknown',
+      assigned_to_agent_id: assigned_to_agent_id || null,
+      is_in_use: !!assigned_to_agent_id,
+      metadata: typeof metadata === 'object' ? metadata : {},
+      notes: notes || null,
+    }
+
+    // Create the number
+    const { data: newNumber, error: createError } = await supabaseAdmin
+      .from('inbound_numbers')
+      .insert(numberData)
+      .select()
+      .single()
+
+    if (createError) {
+      console.error('Create inbound number error:', createError)
+      return res.status(400).json({ error: createError.message || 'Failed to create inbound number' })
+    }
+
+    // Log admin activity
+    await logAdminActivity(req.admin.id, 'inbound_number_created', {
+      target_type: 'inbound_number',
+      target_id: newNumber.id,
+      ip: req.ip,
+      extra: {
+        phone_number: `${country_code}${phone_number}`,
+        provider,
+        user_id,
+        verification_success: true,
+      },
+    })
+
+    res.status(201).json({
+      success: true,
+      message: 'Inbound number created successfully',
+      number: newNumber,
+      verification: {
+        success: true,
+        account: verification.account,
+      },
+    })
+  } catch (err) {
+    console.error('Create inbound number error:', err)
+    res.status(500).json({ error: 'Failed to create inbound number' })
+  }
+}
 
 /**
  * GET /api/inbound-numbers
@@ -266,6 +498,8 @@ const assignToAgent = async (req, res) => {
 }
 
 module.exports = {
+  verifyConnection,
+  createInboundNumber,
   getInboundNumbers,
   getInboundNumberById,
   updateInboundNumber,

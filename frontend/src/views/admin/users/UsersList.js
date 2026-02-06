@@ -29,6 +29,9 @@ import {
   CFormLabel,
   CFormCheck,
   CTooltip,
+  CNav,
+  CNavItem,
+  CNavLink,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import {
@@ -42,9 +45,11 @@ import {
   cilLockLocked,
   cilReload,
   cilCopy,
+  cilAccountLogout,
+  cilShieldAlt,
 } from '@coreui/icons'
 import { useAuth } from '../../../contexts/AuthContext'
-import { usersAPI } from '../../../utils/api'
+import { usersAPI, adminAPI, authAPI } from '../../../utils/api'
 
 const UsersList = () => {
   const navigate = useNavigate()
@@ -52,9 +57,11 @@ const UsersList = () => {
   const { adminProfile, rolePrefix } = useAuth()
   const isCurrentUserSuperAdmin = adminProfile?.role === 'super_admin'
   const [users, setUsers] = useState([])
+  const [allUsers, setAllUsers] = useState([]) // Store all users for filtering
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all')
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'consumer') // 'consumer' or 'admin'
   const [totalCount, setTotalCount] = useState(0)
   const currentPage = parseInt(searchParams.get('page') || '1')
   const page = currentPage - 1 // URL uses 1-based, backend uses 0-based
@@ -110,24 +117,45 @@ const UsersList = () => {
       if (searchTerm) params.search = searchTerm
 
       const data = await usersAPI.list(params)
-      setUsers(data.users || [])
-      setTotalCount(data.total || 0)
+      setAllUsers(data.users || [])
     } catch (err) {
       console.error('Fetch users error:', err)
       setAlert({ color: 'danger', message: err.message })
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter, searchTerm, pageSize])
+  }, [page, statusFilter, searchTerm, pageSize, activeTab])
 
   // Update URL when filters change
-  const updateURL = useCallback((newPage, newStatus, newSearch) => {
+  const updateURL = useCallback((newPage, newStatus, newSearch, newTab) => {
     const params = new URLSearchParams()
     if (newPage > 0) params.set('page', newPage.toString())
     if (newStatus && newStatus !== 'all') params.set('status', newStatus)
     if (newSearch) params.set('search', newSearch)
+    if (newTab) params.set('tab', newTab)
     setSearchParams(params, { replace: true })
   }, [setSearchParams])
+
+  // Handle tab change
+  const handleTabChange = (tab) => {
+    setActiveTab(tab)
+    updateURL(1, statusFilter, searchTerm, tab) // Reset to page 1 when changing tabs
+  }
+
+  // Filter users when tab changes (client-side filtering after data is loaded)
+  useEffect(() => {
+    if (allUsers.length > 0) {
+      const filteredUsers = allUsers.filter(user => {
+        if (activeTab === 'consumer') {
+          return user.role === 'consumer'
+        } else {
+          return user.role !== 'consumer' && user.is_admin
+        }
+      })
+      setUsers(filteredUsers)
+      setTotalCount(filteredUsers.length)
+    }
+  }, [activeTab, allUsers])
 
   useEffect(() => {
     fetchUsers()
@@ -303,22 +331,106 @@ const UsersList = () => {
   }
 
   // =====================
+  // ADMIN MANAGEMENT (for admin tab)
+  // =====================
+  const handleForceLogout = async () => {
+    if (!forceLogoutModal.user) return
+    setForceLogoutLoading(true)
+    try {
+      await authAPI.forceLogout(forceLogoutModal.user.id)
+      setAlert({
+        color: 'success',
+        message: `Successfully logged out ${forceLogoutModal.user.email}`,
+      })
+      setForceLogoutModal({ visible: false, user: null })
+      fetchUsers()
+    } catch (err) {
+      setAlert({ color: 'danger', message: err.message || 'Failed to force logout' })
+    } finally {
+      setForceLogoutLoading(false)
+    }
+  }
+
+  const handleAdminResetPassword = async () => {
+    if (!adminResetPwModal.user) return
+    setAdminResetPwLoading(true)
+    try {
+      const passwordToSend = adminResetPwForm.generate_password ? adminResetPwGenerated : adminResetPwForm.password
+      if (!passwordToSend || passwordToSend.length < 8) {
+        setAlert({ color: 'danger', message: 'Password must be at least 8 characters long' })
+        setAdminResetPwLoading(false)
+        return
+      }
+      const result = await adminAPI.resetAdminPassword(adminResetPwModal.user.id, {
+        password: passwordToSend,
+        generate_password: adminResetPwForm.generate_password,
+      })
+      setAlert({
+        color: 'success',
+        message: result.message || 'Password reset successfully. Email sent with new password.',
+      })
+      setAdminResetPwModal({ visible: false, user: null })
+      setAdminResetPwForm({ password: '', generate_password: true })
+      setAdminResetPwGenerated('')
+      fetchUsers()
+    } catch (err) {
+      setAlert({ color: 'danger', message: err.message || 'Failed to reset password' })
+    } finally {
+      setAdminResetPwLoading(false)
+    }
+  }
+
+  const handleCreateAdmin = async (e) => {
+    e.preventDefault()
+    setCreateAdminLoading(true)
+    setCreateAdminSuccess(null)
+    try {
+      const payload = {
+        email: createAdminForm.email,
+        first_name: createAdminForm.first_name || undefined,
+        last_name: createAdminForm.last_name || undefined,
+        role: createAdminForm.role,
+      }
+      if (createAdminForm.generate_password) {
+        payload.password = createAdminGenerated
+      } else {
+        payload.password = createAdminForm.password
+      }
+      const result = await adminAPI.createAdmin(payload)
+      setCreateAdminSuccess({
+        message: result.message,
+        admin: result.admin,
+      })
+      setAlert({ color: 'success', message: `Admin "${createAdminForm.email}" created successfully!` })
+      fetchUsers()
+      setTimeout(() => {
+        setCreateAdminModal(false)
+        setCreateAdminSuccess(null)
+      }, 3000)
+    } catch (err) {
+      setAlert({ color: 'danger', message: err.message })
+    } finally {
+      setCreateAdminLoading(false)
+    }
+  }
+
+  // =====================
   // HELPERS
   // =====================
   const handleSearch = (e) => {
     const value = e.target.value
     setSearchTerm(value)
-    updateURL(1, statusFilter, value)
+    updateURL(1, statusFilter, value, activeTab)
   }
 
   const handleStatusFilter = (e) => {
     const value = e.target.value
     setStatusFilter(value)
-    updateURL(1, value, searchTerm)
+    updateURL(1, value, searchTerm, activeTab)
   }
 
   const handlePageChange = (newPage) => {
-    updateURL(newPage, statusFilter, searchTerm)
+    updateURL(newPage, statusFilter, searchTerm, activeTab)
   }
 
   const getStatusBadge = (status) => {
@@ -345,10 +457,29 @@ const UsersList = () => {
                 User Management
               </strong>
               <div className="d-flex align-items-center gap-2">
-                <span className="text-body-secondary small me-2">{totalCount} total users</span>
-                <CButton color="primary" size="sm" onClick={openCreateModal}>
-                  <CIcon icon={cilUserPlus} className="me-1" /> Create User
-                </CButton>
+                <span className="text-body-secondary small me-2">{totalCount} total {activeTab === 'admin' ? 'admins' : 'users'}</span>
+                {activeTab === 'admin' && isCurrentUserSuperAdmin ? (
+                  <CButton color="primary" size="sm" onClick={() => {
+                    const pw = generatePassword()
+                    setCreateAdminForm({
+                      email: '',
+                      first_name: '',
+                      last_name: '',
+                      password: pw,
+                      role: 'support',
+                      generate_password: true,
+                    })
+                    setCreateAdminGenerated(pw)
+                    setCreateAdminSuccess(null)
+                    setCreateAdminModal(true)
+                  }}>
+                    <CIcon icon={cilShieldAlt} className="me-1" /> Create Admin
+                  </CButton>
+                ) : (
+                  <CButton color="primary" size="sm" onClick={openCreateModal}>
+                    <CIcon icon={cilUserPlus} className="me-1" /> Create User
+                  </CButton>
+                )}
               </div>
             </CCardHeader>
             <CCardBody>
@@ -357,6 +488,28 @@ const UsersList = () => {
                   {alert.message}
                 </CAlert>
               )}
+
+              {/* Tabs */}
+              <CNav variant="tabs" className="mb-3">
+                <CNavItem>
+                  <CNavLink
+                    active={activeTab === 'consumer'}
+                    onClick={() => handleTabChange('consumer')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    Consumers
+                  </CNavLink>
+                </CNavItem>
+                <CNavItem>
+                  <CNavLink
+                    active={activeTab === 'admin'}
+                    onClick={() => handleTabChange('admin')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    Admins
+                  </CNavLink>
+                </CNavItem>
+              </CNav>
 
               {/* Filters */}
               <CRow className="mb-3">
@@ -395,9 +548,20 @@ const UsersList = () => {
                       <CTableRow>
                         <CTableHeaderCell>Email</CTableHeaderCell>
                         <CTableHeaderCell>Name</CTableHeaderCell>
-                        <CTableHeaderCell>Phone</CTableHeaderCell>
-                        <CTableHeaderCell>Status</CTableHeaderCell>
-                        <CTableHeaderCell>Email Verified</CTableHeaderCell>
+                        {activeTab === 'admin' ? (
+                          <>
+                            <CTableHeaderCell>Role</CTableHeaderCell>
+                            <CTableHeaderCell>Status</CTableHeaderCell>
+                            <CTableHeaderCell>Last Login</CTableHeaderCell>
+                          </>
+                        ) : (
+                          <>
+                            <CTableHeaderCell>Phone</CTableHeaderCell>
+                            <CTableHeaderCell>Status</CTableHeaderCell>
+                            <CTableHeaderCell>Role</CTableHeaderCell>
+                            <CTableHeaderCell>Email Verified</CTableHeaderCell>
+                          </>
+                        )}
                         <CTableHeaderCell>Joined</CTableHeaderCell>
                         <CTableHeaderCell>Actions</CTableHeaderCell>
                       </CTableRow>
@@ -405,8 +569,8 @@ const UsersList = () => {
                     <CTableBody>
                       {users.length === 0 ? (
                         <CTableRow>
-                          <CTableDataCell colSpan={7} className="text-center text-body-secondary py-4">
-                            No users found
+                          <CTableDataCell colSpan={activeTab === 'admin' ? 6 : 8} className="text-center text-body-secondary py-4">
+                            No {activeTab === 'admin' ? 'admins' : 'users'} found
                           </CTableDataCell>
                         </CTableRow>
                       ) : (
@@ -426,16 +590,67 @@ const UsersList = () => {
                                 {user.first_name} {user.last_name}
                               </div>
                             </CTableDataCell>
-                            <CTableDataCell>
-                              {user.country_code}
-                              {user.phone || '-'}
-                            </CTableDataCell>
-                            <CTableDataCell>{getStatusBadge(user.account_status)}</CTableDataCell>
-                            <CTableDataCell>
-                              <CBadge color={user.email_verified ? 'success' : 'danger'}>
-                                {user.email_verified ? 'Yes' : 'No'}
-                              </CBadge>
-                            </CTableDataCell>
+                            {activeTab === 'admin' ? (
+                              <>
+                                <CTableDataCell>
+                                  <CBadge 
+                                    color={
+                                      user.role === 'super_admin' ? 'danger' :
+                                      user.role === 'finance' ? 'warning' :
+                                      user.role === 'support' ? 'primary' :
+                                      user.role === 'ops' ? 'success' : 'secondary'
+                                    }
+                                  >
+                                    {user.role === 'super_admin' ? 'Super Admin' :
+                                     user.role === 'finance' ? 'Finance' :
+                                     user.role === 'support' ? 'Support' :
+                                     user.role === 'ops' ? 'Operations' : user.role}
+                                  </CBadge>
+                                </CTableDataCell>
+                                <CTableDataCell>
+                                  <CBadge color={user.is_active !== false ? 'success' : 'secondary'}>
+                                    {user.is_active !== false ? 'Active' : 'Inactive'}
+                                  </CBadge>
+                                </CTableDataCell>
+                                <CTableDataCell>
+                                  {user.last_login_at
+                                    ? new Date(user.last_login_at).toLocaleDateString()
+                                    : '-'}
+                                </CTableDataCell>
+                              </>
+                            ) : (
+                              <>
+                                <CTableDataCell>
+                                  {user.country_code}
+                                  {user.phone || '-'}
+                                </CTableDataCell>
+                                <CTableDataCell>{getStatusBadge(user.account_status)}</CTableDataCell>
+                                <CTableDataCell>
+                                  {user.role === 'consumer' ? (
+                                    <CBadge color="info">Consumer</CBadge>
+                                  ) : (
+                                    <CBadge 
+                                      color={
+                                        user.role === 'super_admin' ? 'danger' :
+                                        user.role === 'finance' ? 'warning' :
+                                        user.role === 'support' ? 'primary' :
+                                        user.role === 'ops' ? 'success' : 'secondary'
+                                      }
+                                    >
+                                      {user.role === 'super_admin' ? 'Super Admin' :
+                                       user.role === 'finance' ? 'Finance' :
+                                       user.role === 'support' ? 'Support' :
+                                       user.role === 'ops' ? 'Operations' : user.role}
+                                    </CBadge>
+                                  )}
+                                </CTableDataCell>
+                                <CTableDataCell>
+                                  <CBadge color={user.email_verified ? 'success' : 'danger'}>
+                                    {user.email_verified ? 'Yes' : 'No'}
+                                  </CBadge>
+                                </CTableDataCell>
+                              </>
+                            )}
                             <CTableDataCell>
                               {new Date(user.created_at).toLocaleDateString()}
                             </CTableDataCell>
@@ -457,19 +672,58 @@ const UsersList = () => {
                                 </CTooltip>
 
                                 {/* Reset Password */}
-                                <CTooltip content="Reset password">
-                                  <CButton
-                                    color="secondary"
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setResetPwModal({ visible: true, user })
-                                    }}
-                                  >
-                                    <CIcon icon={cilLockLocked} size="sm" />
-                                  </CButton>
-                                </CTooltip>
+                                {activeTab === 'admin' && user.is_admin ? (
+                                  <CTooltip content="Reset admin password">
+                                    <CButton
+                                      color="secondary"
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        const pw = generatePassword()
+                                        setAdminResetPwForm({
+                                          password: pw,
+                                          generate_password: true,
+                                        })
+                                        setAdminResetPwGenerated(pw)
+                                        setAdminResetPwModal({ visible: true, user })
+                                      }}
+                                    >
+                                      <CIcon icon={cilLockLocked} size="sm" />
+                                    </CButton>
+                                  </CTooltip>
+                                ) : (
+                                  <CTooltip content="Reset password">
+                                    <CButton
+                                      color="secondary"
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setResetPwModal({ visible: true, user })
+                                      }}
+                                    >
+                                      <CIcon icon={cilLockLocked} size="sm" />
+                                    </CButton>
+                                  </CTooltip>
+                                )}
+
+                                {/* Force Logout (only for admins on admin tab) */}
+                                {activeTab === 'admin' && user.is_admin && user.id !== adminProfile?.id && isCurrentUserSuperAdmin && (
+                                  <CTooltip content="Force logout">
+                                    <CButton
+                                      color="warning"
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setForceLogoutModal({ visible: true, user })
+                                      }}
+                                    >
+                                      <CIcon icon={cilAccountLogout} size="sm" />
+                                    </CButton>
+                                  </CTooltip>
+                                )}
 
                                 {/* Suspend / Unsuspend */}
                                 {/* Only show suspend/unsuspend for super admins if current user is also super admin */}
@@ -936,6 +1190,353 @@ const UsersList = () => {
             {resetPwLoading ? <CSpinner size="sm" /> : 'Send Reset Email'}
           </CButton>
         </CModalFooter>
+      </CModal>
+
+      {/* ======================== */}
+      {/* FORCE LOGOUT MODAL (Admin tab only) */}
+      {/* ======================== */}
+      <CModal
+        visible={forceLogoutModal.visible}
+        onClose={() => setForceLogoutModal({ visible: false, user: null })}
+      >
+        <CModalHeader>
+          <CModalTitle>
+            <CIcon icon={cilAccountLogout} className="me-2" />
+            Force Logout Admin
+          </CModalTitle>
+        </CModalHeader>
+        <CModalBody>
+          Are you sure you want to force logout{' '}
+          <strong>{forceLogoutModal.user?.email || 'this admin'}</strong>? This will revoke all
+          active sessions and they will need to log in again.
+        </CModalBody>
+        <CModalFooter>
+          <CButton
+            color="secondary"
+            onClick={() => setForceLogoutModal({ visible: false, user: null })}
+            disabled={forceLogoutLoading}
+          >
+            Cancel
+          </CButton>
+          <CButton color="warning" onClick={handleForceLogout} disabled={forceLogoutLoading}>
+            {forceLogoutLoading ? (
+              <>
+                <CSpinner size="sm" className="me-1" /> Logging out...
+              </>
+            ) : (
+              'Force Logout'
+            )}
+          </CButton>
+        </CModalFooter>
+      </CModal>
+
+      {/* ======================== */}
+      {/* ADMIN RESET PASSWORD MODAL (Admin tab only) */}
+      {/* ======================== */}
+      <CModal
+        visible={adminResetPwModal.visible}
+        onClose={() => {
+          setAdminResetPwModal({ visible: false, user: null })
+          setAdminResetPwForm({ password: '', generate_password: true })
+          setAdminResetPwGenerated('')
+        }}
+        backdrop="static"
+      >
+        <CModalHeader>
+          <CModalTitle>
+            <CIcon icon={cilLockLocked} className="me-2" />
+            Reset Admin Password
+          </CModalTitle>
+        </CModalHeader>
+        <CForm onSubmit={(e) => { e.preventDefault(); handleAdminResetPassword(); }}>
+          <CModalBody>
+            <p className="mb-3">
+              Reset password for <strong>{adminResetPwModal.user?.email || 'this admin'}</strong>. The new
+              password will be sent via email.
+            </p>
+            <CFormCheck
+              type="checkbox"
+              id="admin-generate-password-check"
+              label="Generate random password"
+              checked={adminResetPwForm.generate_password}
+              onChange={(e) => {
+                setAdminResetPwForm({
+                  ...adminResetPwForm,
+                  generate_password: e.target.checked,
+                })
+              }}
+              className="mb-3"
+            />
+            {adminResetPwForm.generate_password ? (
+              <div>
+                <CFormLabel>Generated Password (This will be sent via email)</CFormLabel>
+                <CInputGroup>
+                  <CFormInput
+                    type="text"
+                    value={adminResetPwGenerated}
+                    readOnly
+                    style={{
+                      fontFamily: 'monospace',
+                      fontSize: '0.95rem',
+                      letterSpacing: '0.05em',
+                      backgroundColor: '#f8f9fa',
+                    }}
+                  />
+                  <CButton
+                    color="secondary"
+                    variant="outline"
+                    onClick={() => {
+                      const pw = generatePassword()
+                      setAdminResetPwGenerated(pw)
+                      setAdminResetPwForm((prev) => ({ ...prev, password: pw }))
+                    }}
+                    title="Regenerate password"
+                  >
+                    <CIcon icon={cilReload} size="sm" />
+                  </CButton>
+                  <CButton
+                    color="secondary"
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(adminResetPwGenerated)
+                      setAlert({ color: 'info', message: 'Password copied to clipboard!' })
+                    }}
+                    title="Copy password"
+                  >
+                    <CIcon icon={cilCopy} size="sm" />
+                  </CButton>
+                </CInputGroup>
+                <small className="text-body-secondary d-block mt-2">
+                  This password will be set and sent to {adminResetPwModal.user?.email || 'the admin'} via email.
+                </small>
+              </div>
+            ) : (
+              <div>
+                <CFormLabel>Enter New Password</CFormLabel>
+                <CFormInput
+                  type="text"
+                  value={adminResetPwForm.password}
+                  onChange={(e) =>
+                    setAdminResetPwForm({ ...adminResetPwForm, password: e.target.value })
+                  }
+                  placeholder="Enter new password (min 8 characters)"
+                  required
+                  minLength={8}
+                />
+                <small className="text-body-secondary d-block mt-2">
+                  Password must be at least 8 characters long. This password will be set and sent via email.
+                </small>
+              </div>
+            )}
+          </CModalBody>
+          <CModalFooter>
+            <CButton
+              color="secondary"
+              onClick={() => {
+                setAdminResetPwModal({ visible: false, user: null })
+                setAdminResetPwForm({ password: '', generate_password: true })
+                setAdminResetPwGenerated('')
+              }}
+              disabled={adminResetPwLoading}
+            >
+              Cancel
+            </CButton>
+            <CButton type="submit" color="primary" disabled={adminResetPwLoading}>
+              {adminResetPwLoading ? (
+                <>
+                  <CSpinner size="sm" className="me-1" /> Resetting...
+                </>
+              ) : (
+                'Reset Password'
+              )}
+            </CButton>
+          </CModalFooter>
+        </CForm>
+      </CModal>
+
+      {/* ======================== */}
+      {/* CREATE ADMIN MODAL (Admin tab only) */}
+      {/* ======================== */}
+      <CModal
+        size="lg"
+        visible={createAdminModal}
+        onClose={() => setCreateAdminModal(false)}
+        backdrop="static"
+      >
+        <CModalHeader>
+          <CModalTitle>
+            <CIcon icon={cilShieldAlt} className="me-2" />
+            Create New Admin
+          </CModalTitle>
+        </CModalHeader>
+        <CForm onSubmit={handleCreateAdmin}>
+          <CModalBody>
+            {createAdminSuccess ? (
+              <CAlert color="success">
+                <h6 className="alert-heading">Admin Created!</h6>
+                <p>{createAdminSuccess.message}</p>
+                <p>
+                  <strong>Email:</strong> {createAdminSuccess.admin.email}
+                </p>
+                <p>
+                  <strong>Role:</strong>{' '}
+                  <CBadge
+                    color={
+                      createAdminSuccess.admin.role === 'super_admin' ? 'danger' :
+                      createAdminSuccess.admin.role === 'finance' ? 'warning' :
+                      createAdminSuccess.admin.role === 'support' ? 'primary' :
+                      createAdminSuccess.admin.role === 'ops' ? 'success' : 'secondary'
+                    }
+                  >
+                    {createAdminSuccess.admin.role === 'super_admin' ? 'Super Admin' :
+                     createAdminSuccess.admin.role === 'finance' ? 'Finance' :
+                     createAdminSuccess.admin.role === 'support' ? 'Support' :
+                     createAdminSuccess.admin.role === 'ops' ? 'Operations' : createAdminSuccess.admin.role}
+                  </CBadge>
+                </p>
+              </CAlert>
+            ) : (
+              <>
+                <CRow className="mb-3">
+                  <CCol md={12}>
+                    <CFormLabel>
+                      Email <span className="text-danger">*</span>
+                    </CFormLabel>
+                    <CFormInput
+                      type="email"
+                      placeholder="admin@example.com"
+                      value={createAdminForm.email}
+                      onChange={(e) => setCreateAdminForm({ ...createAdminForm, email: e.target.value })}
+                      required
+                    />
+                  </CCol>
+                </CRow>
+
+                <CRow className="mb-3">
+                  <CCol md={6}>
+                    <CFormLabel>First Name</CFormLabel>
+                    <CFormInput
+                      placeholder="John"
+                      value={createAdminForm.first_name}
+                      onChange={(e) => setCreateAdminForm({ ...createAdminForm, first_name: e.target.value })}
+                    />
+                  </CCol>
+                  <CCol md={6}>
+                    <CFormLabel>Last Name</CFormLabel>
+                    <CFormInput
+                      placeholder="Doe"
+                      value={createAdminForm.last_name}
+                      onChange={(e) => setCreateAdminForm({ ...createAdminForm, last_name: e.target.value })}
+                    />
+                  </CCol>
+                </CRow>
+
+                <CRow className="mb-3">
+                  <CCol md={12}>
+                    <CFormLabel>
+                      Role <span className="text-danger">*</span>
+                    </CFormLabel>
+                    <CFormSelect
+                      value={createAdminForm.role}
+                      onChange={(e) => setCreateAdminForm({ ...createAdminForm, role: e.target.value })}
+                      required
+                    >
+                      <option value="support">Support</option>
+                      <option value="finance">Finance</option>
+                      <option value="ops">Operations</option>
+                      <option value="super_admin">Super Admin</option>
+                    </CFormSelect>
+                    <div className="form-text">
+                      Select the role for this admin. Super Admin has full access.
+                    </div>
+                  </CCol>
+                </CRow>
+
+                <hr />
+
+                <CRow className="mb-3">
+                  <CCol md={12}>
+                    <CFormCheck
+                      id="admin-generatePassword"
+                      label="Auto-generate a strong password"
+                      checked={createAdminForm.generate_password}
+                      onChange={(e) =>
+                        setCreateAdminForm({ ...createAdminForm, generate_password: e.target.checked })
+                      }
+                    />
+                  </CCol>
+                </CRow>
+
+                <CRow className="mb-3">
+                  <CCol md={12}>
+                    <CFormLabel>
+                      Password <span className="text-danger">*</span>
+                    </CFormLabel>
+                    <CInputGroup>
+                      <CFormInput
+                        type="text"
+                        value={createAdminForm.generate_password ? createAdminGenerated : createAdminForm.password}
+                        onChange={(e) => setCreateAdminForm({ ...createAdminForm, password: e.target.value })}
+                        readOnly={createAdminForm.generate_password}
+                        required
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: '0.95rem',
+                          letterSpacing: '0.05em',
+                        }}
+                      />
+                      {createAdminForm.generate_password && (
+                        <CButton
+                          color="secondary"
+                          variant="outline"
+                          onClick={() => {
+                            const pw = generatePassword()
+                            setCreateAdminGenerated(pw)
+                            setCreateAdminForm((prev) => ({ ...prev, password: pw }))
+                          }}
+                          title="Regenerate password"
+                        >
+                          <CIcon icon={cilReload} size="sm" />
+                        </CButton>
+                      )}
+                      <CButton
+                        color="primary"
+                        variant="outline"
+                        onClick={() => {
+                          const pw = createAdminForm.generate_password ? createAdminGenerated : createAdminForm.password
+                          navigator.clipboard.writeText(pw)
+                          setAlert({ color: 'info', message: 'Password copied to clipboard!' })
+                        }}
+                        title="Copy password"
+                      >
+                        <CIcon icon={cilCopy} size="sm" />
+                      </CButton>
+                    </CInputGroup>
+                    <div className="form-text">
+                      This password will be emailed to the admin along with their account details.
+                    </div>
+                  </CCol>
+                </CRow>
+              </>
+            )}
+          </CModalBody>
+          <CModalFooter>
+            <CButton color="secondary" onClick={() => setCreateAdminModal(false)}>
+              {createAdminSuccess ? 'Close' : 'Cancel'}
+            </CButton>
+            {!createAdminSuccess && (
+              <CButton type="submit" color="primary" disabled={createAdminLoading}>
+                {createAdminLoading ? (
+                  <>
+                    <CSpinner size="sm" className="me-1" /> Creating...
+                  </>
+                ) : (
+                  'Create Admin'
+                )}
+              </CButton>
+            )}
+          </CModalFooter>
+        </CForm>
       </CModal>
     </>
   )

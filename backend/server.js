@@ -7,6 +7,7 @@ const morgan = require('morgan')
 const rateLimit = require('express-rate-limit')
 
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler')
+const { checkMaintenanceMode, checkReadOnlyMode } = require('./middleware/systemMode')
 
 // Route imports
 const authRoutes = require('./routes/auth')
@@ -17,6 +18,13 @@ const callsRoutes = require('./routes/calls')
 const creditsRoutes = require('./routes/credits')
 const subscriptionsRoutes = require('./routes/subscriptions')
 const inboundNumbersRoutes = require('./routes/inboundNumbers')
+const invoicesRoutes = require('./routes/invoices')
+const supportRoutes = require('./routes/support')
+const featureFlagsRoutes = require('./routes/featureFlags')
+const systemSettingsRoutes = require('./routes/systemSettings')
+const kycRoutes = require('./routes/kyc')
+const reportsRoutes = require('./routes/reports')
+const securityRoutes = require('./routes/security')
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -44,6 +52,10 @@ app.use(morgan('dev'))
 // Body parsing
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
+
+// System mode checks (maintenance and read-only)
+app.use(checkMaintenanceMode)
+app.use(checkReadOnlyMode)
 
 // Rate limiting
 const apiLimiter = rateLimit({
@@ -93,9 +105,30 @@ app.use('/api/credits', apiLimiter, creditsRoutes)
 
 // Subscriptions & packages
 app.use('/api/subscriptions', apiLimiter, subscriptionsRoutes)
+app.use('/api/packages', apiLimiter, require('./routes/packages'))
 
 // Inbound numbers
 app.use('/api/inbound-numbers', apiLimiter, inboundNumbersRoutes)
+
+// Invoices & billing
+app.use('/api/invoices', apiLimiter, invoicesRoutes)
+app.use('/api/invoice-settings', apiLimiter, require('./routes/invoiceSettings'))
+app.use('/api/payments', apiLimiter, require('./routes/payments'))
+app.use('/api/refunds-disputes', apiLimiter, require('./routes/refundsDisputes'))
+app.use('/api/coupons', apiLimiter, require('./routes/coupons'))
+app.use('/api/invoice-email-logs', apiLimiter, require('./routes/invoiceEmailLogs'))
+
+// Support & Operations
+app.use('/api/support', apiLimiter, supportRoutes)
+app.use('/api', apiLimiter, featureFlagsRoutes)
+app.use('/api', apiLimiter, systemSettingsRoutes)
+app.use('/api', apiLimiter, kycRoutes)
+
+// Reports & Exports
+app.use('/api/reports', apiLimiter, reportsRoutes)
+
+// Security & Monitoring
+app.use('/api/security', apiLimiter, securityRoutes)
 
 // ======================
 // ERROR HANDLING
@@ -146,6 +179,16 @@ app.listen(PORT, () => {
   console.log(`  POST   /api/subscriptions/packages`)
   console.log(`  GET    /api/inbound-numbers`)
   console.log(`  GET    /api/inbound-numbers/:id`)
+  console.log(`  POST   /api/invoices/process-emails`)
+  console.log(`  POST   /api/invoices/:id/send-email`)
+  console.log(`  GET    /api/support/tickets`)
+  console.log(`  POST   /api/support/tickets`)
+  console.log(`  GET    /api/feature-flags`)
+  console.log(`  POST   /api/feature-flags`)
+  console.log(`  GET    /api/system-settings`)
+  console.log(`  PUT    /api/system-settings/:key`)
+  console.log(`  GET    /api/kyc/pending`)
+  console.log(`  POST   /api/kyc/users/:id/approve`)
   console.log(`  GET    /api/health\n`)
 })
 

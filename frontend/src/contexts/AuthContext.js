@@ -28,6 +28,10 @@ export const AuthProvider = ({ children }) => {
       return response.admin || null
     } catch (err) {
       console.warn('Error fetching admin profile from API:', err)
+      // If error message indicates force logout, throw a specific error
+      if (err.message?.includes('revoked') || err.message?.includes('session has been revoked')) {
+        throw new Error('FORCE_LOGOUT')
+      }
       return null
     }
   }, [])
@@ -66,19 +70,42 @@ export const AuthProvider = ({ children }) => {
 
           // Verify token with the backend
           setSession(sessionObj)
-          const profile = await fetchAdminProfile()
-          if (!isMounted) return
+          try {
+            const profile = await fetchAdminProfile()
+            if (!isMounted) return
 
-          if (profile) {
-            setAdminProfile(profile)
-          } else {
-            // Token is invalid or user is not an admin — clear everything
-            setSession(null)
-            setAdminProfile(null)
-            clearAuthToken()
-            // Clean up the invalid session from Supabase storage
-            if (supabase) {
-              supabase.auth.signOut().catch(() => {})
+            if (profile) {
+              setAdminProfile(profile)
+            } else {
+              // Token is invalid or user is not an admin — clear everything
+              setSession(null)
+              setAdminProfile(null)
+              clearAuthToken()
+              // Clean up the invalid session from Supabase storage
+              if (supabase) {
+                supabase.auth.signOut().catch(() => {})
+              }
+            }
+          } catch (profileError) {
+            if (!isMounted) return
+            // Force logout detected
+            if (profileError.message === 'FORCE_LOGOUT') {
+              setSession(null)
+              setAdminProfile(null)
+              clearAuthToken()
+              // Clean up the invalid session from Supabase storage
+              if (supabase) {
+                supabase.auth.signOut().catch(() => {})
+              }
+              // Redirect will happen via ProtectedRoute when isAuthenticated becomes false
+            } else {
+              // Other error - clear session
+              setSession(null)
+              setAdminProfile(null)
+              clearAuthToken()
+              if (supabase) {
+                supabase.auth.signOut().catch(() => {})
+              }
             }
           }
         }
@@ -223,9 +250,57 @@ export const AuthProvider = ({ children }) => {
     const profile = await fetchAdminProfile()
     if (profile) {
       setAdminProfile(profile)
+    } else {
+      // Profile fetch failed - might be force logged out
+      // Clear session and log out
+      setSession(null)
+      setAdminProfile(null)
+      clearAuthToken()
+      if (supabase) {
+        await supabase.auth.signOut().catch(() => {})
+      }
     }
     return profile
   }, [fetchAdminProfile])
+
+  // Periodically check if user has been force logged out
+  useEffect(() => {
+    if (!session || !adminProfile) return
+
+    const checkForceLogout = async () => {
+      try {
+        const profile = await fetchAdminProfile()
+        if (!profile) {
+          // Force logged out or session invalid - clear everything and redirect
+          setSession(null)
+          setAdminProfile(null)
+          clearAuthToken()
+          if (supabase) {
+            await supabase.auth.signOut().catch(() => {})
+          }
+          // Redirect will happen via ProtectedRoute
+          window.location.href = '/login'
+        }
+      } catch (err) {
+        // If error indicates force logout, clear session and redirect
+        if (err.message === 'FORCE_LOGOUT' || err.message?.includes('revoked') || err.message?.includes('session has been revoked')) {
+          setSession(null)
+          setAdminProfile(null)
+          clearAuthToken()
+          if (supabase) {
+            await supabase.auth.signOut().catch(() => {})
+          }
+          // Force redirect to login page
+          window.location.href = '/login'
+        }
+      }
+    }
+
+    // Check every 30 seconds if user is still valid
+    const interval = setInterval(checkForceLogout, 30000)
+
+    return () => clearInterval(interval)
+  }, [session, adminProfile, fetchAdminProfile])
 
   const value = {
     session,

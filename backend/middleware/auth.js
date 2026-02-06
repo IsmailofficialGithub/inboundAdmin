@@ -23,6 +23,11 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid or expired token' })
     }
 
+    // Check if user has been force logged out
+    if (user.app_metadata?.force_logout) {
+      return res.status(401).json({ error: 'Your session has been revoked. Please log in again.' })
+    }
+
     // Fetch admin profile using service role client (bypasses RLS)
     const { data: adminProfile, error: profileError } = await supabaseAdmin
       .from('admin_profiles')

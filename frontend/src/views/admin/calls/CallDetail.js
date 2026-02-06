@@ -5,7 +5,7 @@ import {
   CAlert, CTable, CTableBody, CTableDataCell, CTableHead, CTableHeaderCell, CTableRow,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilArrowLeft, cilPhone } from '@coreui/icons'
+import { cilArrowLeft, cilPhone, cilCloudDownload } from '@coreui/icons'
 import { useAuth } from '../../../contexts/AuthContext'
 import { callsAPI } from '../../../utils/api'
 
@@ -113,6 +113,7 @@ const CallDetail = () => {
                     <CTableHeaderCell>Size</CTableHeaderCell>
                     <CTableHeaderCell>Transcript</CTableHeaderCell>
                     <CTableHeaderCell>Created</CTableHeaderCell>
+                    <CTableHeaderCell>Audio Player</CTableHeaderCell>
                     <CTableHeaderCell>Action</CTableHeaderCell>
                   </CTableRow>
                 </CTableHead>
@@ -130,9 +131,21 @@ const CallDetail = () => {
                       <CTableDataCell className="small">{new Date(rec.created_at).toLocaleString()}</CTableDataCell>
                       <CTableDataCell>
                         {rec.recording_url && (
-                          <CButton color="primary" size="sm" variant="outline"
-                            href={rec.recording_url} target="_blank" rel="noopener noreferrer">
-                            Play / Download
+                          <audio controls style={{ width: '100%', maxWidth: '300px' }}>
+                            <source src={rec.recording_url} type="audio/mpeg" />
+                            <source src={rec.recording_url} type="audio/wav" />
+                            <source src={rec.recording_url} type="audio/ogg" />
+                            Your browser does not support the audio element.
+                          </audio>
+                        )}
+                      </CTableDataCell>
+                      <CTableDataCell>
+                        {rec.recording_url && (
+                          <CButton color="secondary" size="sm" variant="outline"
+                            href={rec.recording_url} target="_blank" rel="noopener noreferrer"
+                            download>
+                            <CIcon icon={cilCloudDownload} className="me-1" />
+                            Download
                           </CButton>
                         )}
                       </CTableDataCell>
@@ -145,10 +158,20 @@ const CallDetail = () => {
 
           {call.recording_url && recordings.length === 0 && (
             <div className="mt-3">
-              <h6 className="text-body-secondary">Recording</h6>
-              <CButton color="primary" size="sm" variant="outline"
-                href={call.recording_url} target="_blank" rel="noopener noreferrer">
-                Play / Download Recording
+              <h6 className="text-body-secondary mb-3">Recording</h6>
+              <div className="mb-3">
+                <audio controls style={{ width: '100%', maxWidth: '500px' }}>
+                  <source src={call.recording_url} type="audio/mpeg" />
+                  <source src={call.recording_url} type="audio/wav" />
+                  <source src={call.recording_url} type="audio/ogg" />
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+              <CButton color="secondary" size="sm" variant="outline"
+                href={call.recording_url} target="_blank" rel="noopener noreferrer"
+                download>
+                <CIcon icon={cilCloudDownload} className="me-1" />
+                Download Recording
               </CButton>
             </div>
           )}
