@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   CCard,
   CCardBody,
@@ -24,13 +25,16 @@ import { cilSearch, cilHistory } from '@coreui/icons'
 import { supabase } from '../../../supabase/supabaseClient'
 
 const ActivityLog = () => {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [actionFilter, setActionFilter] = useState('all')
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
+  const [actionFilter, setActionFilter] = useState(searchParams.get('action') || 'all')
   const [totalCount, setTotalCount] = useState(0)
-  const [page, setPage] = useState(0)
-  const pageSize = 25
+  const currentPage = parseInt(searchParams.get('page') || '1')
+  const page = currentPage - 1 // URL uses 1-based, backend uses 0-based
+  const pageSize = 50
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   const fetchActivities = useCallback(async () => {
     setLoading(true)
@@ -59,7 +63,16 @@ const ActivityLog = () => {
     } finally {
       setLoading(false)
     }
-  }, [page, actionFilter])
+  }, [page, actionFilter, pageSize])
+
+  // Update URL when filters change
+  const updateURL = useCallback((newPage, newAction, newSearch) => {
+    const params = new URLSearchParams()
+    if (newPage > 0) params.set('page', newPage.toString())
+    if (newAction && newAction !== 'all') params.set('action', newAction)
+    if (newSearch) params.set('search', newSearch)
+    setSearchParams(params, { replace: true })
+  }, [setSearchParams])
 
   useEffect(() => {
     fetchActivities()
@@ -75,7 +88,21 @@ const ActivityLog = () => {
     return 'info'
   }
 
-  const totalPages = Math.ceil(totalCount / pageSize)
+  const handleSearch = (e) => {
+    const value = e.target.value
+    setSearchTerm(value)
+    updateURL(1, actionFilter, value)
+  }
+
+  const handleActionFilter = (e) => {
+    const value = e.target.value
+    setActionFilter(value)
+    updateURL(1, value, searchTerm)
+  }
+
+  const handlePageChange = (newPage) => {
+    updateURL(newPage, actionFilter, searchTerm)
+  }
 
   return (
     <CRow>
@@ -99,20 +126,14 @@ const ActivityLog = () => {
                   <CFormInput
                     placeholder="Search by action or details..."
                     value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value)
-                      setPage(0)
-                    }}
+                    onChange={handleSearch}
                   />
                 </CInputGroup>
               </CCol>
               <CCol md={3}>
                 <CFormSelect
                   value={actionFilter}
-                  onChange={(e) => {
-                    setActionFilter(e.target.value)
-                    setPage(0)
-                  }}
+                  onChange={handleActionFilter}
                 >
                   <option value="all">All Actions</option>
                   <option value="admin_login">Admin Login</option>
@@ -218,25 +239,25 @@ const ActivityLog = () => {
                       Page {page + 1} of {totalPages}
                     </span>
                     <div>
-                      <CButton
-                        color="primary"
-                        variant="outline"
-                        size="sm"
-                        className="me-2"
-                        disabled={page === 0}
-                        onClick={() => setPage(page - 1)}
-                      >
-                        Previous
-                      </CButton>
-                      <CButton
-                        color="primary"
-                        variant="outline"
-                        size="sm"
-                        disabled={page >= totalPages - 1}
-                        onClick={() => setPage(page + 1)}
-                      >
-                        Next
-                      </CButton>
+                        <CButton
+                          color="primary"
+                          variant="outline"
+                          size="sm"
+                          className="me-2"
+                          disabled={page === 0}
+                          onClick={() => handlePageChange(currentPage)}
+                        >
+                          Previous
+                        </CButton>
+                        <CButton
+                          color="primary"
+                          variant="outline"
+                          size="sm"
+                          disabled={page >= totalPages - 1}
+                          onClick={() => handlePageChange(currentPage + 1)}
+                        >
+                          Next
+                        </CButton>
                     </div>
                   </div>
                 )}

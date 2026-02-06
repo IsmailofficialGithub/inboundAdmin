@@ -43,6 +43,16 @@ const apiRequest = async (endpoint, options = {}) => {
 // ========================
 export const authAPI = {
   getMe: () => apiRequest('/auth/me'),
+  updateProfile: (profileData) =>
+    apiRequest('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
+    }),
+  getSessions: () => apiRequest('/auth/sessions'),
+  forceLogout: (adminId) =>
+    apiRequest(`/auth/force-logout/${adminId}`, {
+      method: 'POST',
+    }),
 }
 
 // ========================
@@ -108,10 +118,19 @@ export const adminAPI = {
     const query = new URLSearchParams(params).toString()
     return apiRequest(`/admin/security-events?${query}`)
   },
+  getAdmins: (params = {}) => {
+    const query = new URLSearchParams(params).toString()
+    return apiRequest(`/admin/admins?${query}`)
+  },
   createAdmin: (adminData) =>
     apiRequest('/admin/create-admin', {
       method: 'POST',
       body: JSON.stringify(adminData),
+    }),
+  resetAdminPassword: (adminId, passwordData) =>
+    apiRequest(`/admin/reset-password/${adminId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(passwordData),
     }),
 }
 

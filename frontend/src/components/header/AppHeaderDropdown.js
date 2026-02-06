@@ -62,6 +62,10 @@ const AppHeaderDropdown = () => {
             </CBadge>
           )}
         </CDropdownHeader>
+        <CDropdownItem href={`/${prefix}/profile`}>
+          <CIcon icon={cilSettings} className="me-2" />
+          Profile
+        </CDropdownItem>
         <CDropdownItem href={`/${prefix}/dashboard`}>
           <CIcon icon={cilUser} className="me-2" />
           Dashboard

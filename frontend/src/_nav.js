@@ -53,6 +53,13 @@ const getNavItems = (rolePrefix = 'admin') => {
     },
     {
       component: CNavItem,
+      name: 'Admins',
+      to: `${prefix}/admins`,
+      icon: <CIcon icon={cilShieldAlt} customClassName="nav-icon" />,
+      // Only show to super_admin (handled by ProtectedRoute)
+    },
+    {
+      component: CNavItem,
       name: 'Activity Log',
       to: `${prefix}/activity-log`,
       icon: <CIcon icon={cilHistory} customClassName="nav-icon" />,

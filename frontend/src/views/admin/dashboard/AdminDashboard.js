@@ -109,7 +109,7 @@ const AdminDashboard = () => {
       </h4>
 
       {/* Stats Widgets */}
-      <CRow className="mb-4">
+      <CRow className="mb-4 stats-widgets-row">
         <CCol sm={6} lg={3}>
           <CWidgetStatsA
             className="mb-4"

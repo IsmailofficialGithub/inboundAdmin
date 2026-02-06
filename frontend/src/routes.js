@@ -4,9 +4,11 @@ import React from 'react'
 // ADMIN PAGES
 // ============================================================
 const AdminDashboard = React.lazy(() => import('./views/admin/dashboard/AdminDashboard'))
+const Profile = React.lazy(() => import('./views/admin/profile/Profile'))
 const UsersList = React.lazy(() => import('./views/admin/users/UsersList'))
 const UserDetail = React.lazy(() => import('./views/admin/users/UserDetail'))
 const ActivityLog = React.lazy(() => import('./views/admin/activity/ActivityLog'))
+const AdminsList = React.lazy(() => import('./views/admin/admins/AdminsList'))
 
 // ============================================================
 // ORIGINAL TEMPLATE PAGES (kept, not removed)
@@ -69,9 +71,11 @@ const Widgets = React.lazy(() => import('./views/widgets/Widgets'))
 const routes = [
   // ADMIN ROUTES
   { path: 'dashboard', name: 'Dashboard', element: AdminDashboard },
+  { path: 'profile', name: 'Profile', element: Profile },
   { path: 'users', name: 'Users', element: UsersList, exact: true },
   { path: 'users/list', name: 'All Users', element: UsersList },
   { path: 'users/:id', name: 'User Detail', element: UserDetail },
+  { path: 'admins', name: 'Admins', element: AdminsList, requiredRoles: ['super_admin'] },
   { path: 'activity-log', name: 'Activity Log', element: ActivityLog },
 
   // ============================================================

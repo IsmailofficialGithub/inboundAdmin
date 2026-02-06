@@ -218,6 +218,15 @@ export const AuthProvider = ({ children }) => {
   // Computed role prefix for URL routing
   const rolePrefix = adminProfile ? getRolePrefix(adminProfile.role) : null
 
+  // Refresh admin profile (useful after updates)
+  const refreshProfile = useCallback(async () => {
+    const profile = await fetchAdminProfile()
+    if (profile) {
+      setAdminProfile(profile)
+    }
+    return profile
+  }, [fetchAdminProfile])
+
   const value = {
     session,
     adminProfile,
@@ -227,6 +236,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     hasRole,
     rolePrefix,
+    refreshProfile,
     isAuthenticated: !!session && !!adminProfile,
     isSupabaseConfigured,
   }

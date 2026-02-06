@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react'
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { CContainer, CSpinner } from '@coreui/react'
+import ProtectedRoute from './ProtectedRoute'
 
 // routes config
 import routes from '../routes'
@@ -20,7 +21,15 @@ const AppContent = () => {
                   path={route.path}
                   exact={route.exact}
                   name={route.name}
-                  element={<route.element />}
+                  element={
+                    route.requiredRoles ? (
+                      <ProtectedRoute requiredRoles={route.requiredRoles}>
+                        <route.element />
+                      </ProtectedRoute>
+                    ) : (
+                      <route.element />
+                    )
+                  }
                 />
               )
             )

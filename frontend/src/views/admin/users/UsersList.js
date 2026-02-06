@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CButton,
   CCard,
@@ -48,15 +48,18 @@ import { usersAPI } from '../../../utils/api'
 
 const UsersList = () => {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { adminProfile, rolePrefix } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all')
   const [totalCount, setTotalCount] = useState(0)
-  const [page, setPage] = useState(0)
+  const currentPage = parseInt(searchParams.get('page') || '1')
+  const page = currentPage - 1 // URL uses 1-based, backend uses 0-based
   const [alert, setAlert] = useState(null)
-  const pageSize = 20
+  const pageSize = 50
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   // ---- Create User Modal ----
   const [createModal, setCreateModal] = useState(false)
@@ -114,7 +117,16 @@ const UsersList = () => {
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter, searchTerm])
+  }, [page, statusFilter, searchTerm, pageSize])
+
+  // Update URL when filters change
+  const updateURL = useCallback((newPage, newStatus, newSearch) => {
+    const params = new URLSearchParams()
+    if (newPage > 0) params.set('page', newPage.toString())
+    if (newStatus && newStatus !== 'all') params.set('status', newStatus)
+    if (newSearch) params.set('search', newSearch)
+    setSearchParams(params, { replace: true })
+  }, [setSearchParams])
 
   useEffect(() => {
     fetchUsers()
@@ -293,13 +305,19 @@ const UsersList = () => {
   // HELPERS
   // =====================
   const handleSearch = (e) => {
-    setSearchTerm(e.target.value)
-    setPage(0)
+    const value = e.target.value
+    setSearchTerm(value)
+    updateURL(1, statusFilter, value)
   }
 
   const handleStatusFilter = (e) => {
-    setStatusFilter(e.target.value)
-    setPage(0)
+    const value = e.target.value
+    setStatusFilter(value)
+    updateURL(1, value, searchTerm)
+  }
+
+  const handlePageChange = (newPage) => {
+    updateURL(newPage, statusFilter, searchTerm)
   }
 
   const getStatusBadge = (status) => {
@@ -311,8 +329,6 @@ const UsersList = () => {
     }
     return <CBadge color={colorMap[status] || 'secondary'}>{status}</CBadge>
   }
-
-  const totalPages = Math.ceil(totalCount / pageSize)
 
   // =====================
   // RENDER
@@ -523,7 +539,7 @@ const UsersList = () => {
                           size="sm"
                           className="me-2"
                           disabled={page === 0}
-                          onClick={() => setPage(page - 1)}
+                          onClick={() => handlePageChange(page)}
                         >
                           Previous
                         </CButton>
@@ -532,7 +548,7 @@ const UsersList = () => {
                           variant="outline"
                           size="sm"
                           disabled={page >= totalPages - 1}
-                          onClick={() => setPage(page + 1)}
+                          onClick={() => handlePageChange(page + 2)}
                         >
                           Next
                         </CButton>
