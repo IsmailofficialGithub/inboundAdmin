@@ -39,10 +39,17 @@ const login = async (req, res) => {
       .update({ last_login_at: new Date().toISOString() })
       .eq('id', data.user.id)
 
-    // Log the login activity
+    // Extract device/browser info from headers
+    const userAgent = req.headers['user-agent'] || ''
+    const deviceInfo = {
+      user_agent: userAgent,
+      ip_address: req.ip || req.connection.remoteAddress,
+    }
+
+    // Log the login activity with device info
     await logAdminActivity(data.user.id, 'admin_login', {
       ip: req.ip,
-      extra: { email },
+      extra: { email, ...deviceInfo },
     })
 
     // Map role to URL prefix
@@ -153,4 +160,167 @@ const refreshToken = async (req, res) => {
   }
 }
 
-module.exports = { login, logout, getMe, refreshToken }
+/**
+ * PUT /api/auth/profile
+ * Update current admin profile
+ * Note: Email cannot be changed through this endpoint
+ */
+const updateProfile = async (req, res) => {
+  try {
+    const { first_name, last_name } = req.body
+    const adminId = req.admin.id
+
+    // Reject email updates if attempted
+    if (req.body.email !== undefined) {
+      return res.status(400).json({ error: 'Email cannot be changed. Please contact an administrator.' })
+    }
+
+    // Build update object (only include fields that were provided)
+    const updateData = { updated_at: new Date().toISOString() }
+    if (first_name !== undefined) updateData.first_name = first_name
+    if (last_name !== undefined) updateData.last_name = last_name
+
+    // Update admin profile
+    const { error: profileError } = await supabaseAdmin
+      .from('admin_profiles')
+      .update(updateData)
+      .eq('id', adminId)
+
+    if (profileError) throw profileError
+
+    // Log the profile update activity
+    await logAdminActivity(adminId, 'admin_profile_updated', {
+      ip: req.ip,
+      extra: {
+        updated_fields: Object.keys(updateData).filter((k) => k !== 'updated_at'),
+      },
+    })
+
+    // Fetch updated admin profile
+    const { data: updatedProfile, error: fetchError } = await supabaseAdmin
+      .from('admin_profiles')
+      .select('*')
+      .eq('id', adminId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    const rolePrefixMap = {
+      super_admin: 'admin',
+      finance: 'finance',
+      support: 'support',
+      ops: 'ops',
+    }
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      admin: {
+        id: updatedProfile.id,
+        email: updatedProfile.email,
+        first_name: updatedProfile.first_name,
+        last_name: updatedProfile.last_name,
+        role: updatedProfile.role,
+        rolePrefix: rolePrefixMap[updatedProfile.role] || 'admin',
+        is_active: updatedProfile.is_active,
+        last_login_at: updatedProfile.last_login_at,
+        created_at: updatedProfile.created_at,
+      },
+    })
+  } catch (err) {
+    console.error('Update profile error:', err)
+    res.status(500).json({ error: 'Failed to update profile' })
+  }
+}
+
+/**
+ * GET /api/auth/sessions
+ * Get current admin's login sessions/IP logs
+ */
+const getSessions = async (req, res) => {
+  try {
+    const adminId = req.admin.id
+
+    // Get login activities from admin_activity_log
+    const { data: loginActivities, error } = await supabaseAdmin
+      .from('admin_activity_log')
+      .select('*')
+      .eq('admin_id', adminId)
+      .eq('action', 'admin_login')
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (error) throw error
+
+    // Format sessions data
+    const sessions = (loginActivities || []).map((activity) => ({
+      id: activity.id,
+      login_at: activity.created_at,
+      ip_address: activity.ip_address,
+      user_agent: activity.details?.user_agent || '-',
+      device_info: activity.details || {},
+    }))
+
+    res.json({
+      success: true,
+      sessions,
+    })
+  } catch (err) {
+    console.error('Get sessions error:', err)
+    res.status(500).json({ error: 'Failed to fetch sessions' })
+  }
+}
+
+/**
+ * POST /api/auth/force-logout/:adminId
+ * Force logout an admin (revoke all sessions) - Super Admin only
+ */
+const forceLogout = async (req, res) => {
+  try {
+    const { adminId } = req.params
+    const currentAdminId = req.admin.id
+
+    // Only super_admin can force logout
+    if (req.admin.role !== 'super_admin') {
+      return res.status(403).json({ error: 'Only super admins can force logout other admins' })
+    }
+
+    // Check if admin exists
+    const { data: targetAdmin, error: fetchError } = await supabaseAdmin
+      .from('admin_profiles')
+      .select('*')
+      .eq('id', adminId)
+      .single()
+
+    if (fetchError || !targetAdmin) {
+      return res.status(404).json({ error: 'Admin not found' })
+    }
+
+    // Revoke all sessions for the admin using Supabase Admin API
+    const { error: revokeError } = await supabaseAdmin.auth.admin.signOut(adminId)
+
+    if (revokeError) {
+      console.error('Force logout error:', revokeError)
+      // Continue even if there's an error - the admin might not have active sessions
+    }
+
+    // Log the force logout activity
+    await logAdminActivity(currentAdminId, 'admin_force_logout', {
+      ip: req.ip,
+      extra: {
+        target_admin_id: adminId,
+        target_admin_email: targetAdmin.email,
+      },
+    })
+
+    res.json({
+      success: true,
+      message: `Successfully logged out ${targetAdmin.email}`,
+    })
+  } catch (err) {
+    console.error('Force logout error:', err)
+    res.status(500).json({ error: 'Failed to force logout' })
+  }
+}
+
+module.exports = { login, logout, getMe, refreshToken, updateProfile, getSessions, forceLogout }

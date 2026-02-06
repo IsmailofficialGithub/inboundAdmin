@@ -4,6 +4,26 @@ const { sendEmail } = require('../config/email')
 const { accountCreatedTemplate, accountSuspendedTemplate } = require('../utils/emailTemplates')
 
 /**
+ * Check if a user is a super admin
+ * @param {string} userId - The user ID to check
+ * @returns {Promise<boolean>} - True if user is a super admin
+ */
+const isSuperAdmin = async (userId) => {
+  try {
+    const { data: adminProfile } = await supabaseAdmin
+      .from('admin_profiles')
+      .select('role')
+      .eq('id', userId)
+      .eq('is_active', true)
+      .single()
+    
+    return adminProfile?.role === 'super_admin'
+  } catch {
+    return false
+  }
+}
+
+/**
  * Generate a random password
  */
 const generateRandomPassword = (length = 12) => {
@@ -233,7 +253,7 @@ const updateUser = async (req, res) => {
  */
 const getUsers = async (req, res) => {
   try {
-    const { search, status, page = 0, limit = 20 } = req.query
+    const { search, status, page = 0, limit = 50 } = req.query
     const offset = parseInt(page) * parseInt(limit)
 
     let query = supabaseAdmin
@@ -258,14 +278,16 @@ const getUsers = async (req, res) => {
       return res.status(400).json({ error: error.message })
     }
 
-    // Fetch emails from auth.users for each user
+    // Fetch emails from auth.users for each user and check if they are super admins
     const usersWithEmail = await Promise.all(
       (data || []).map(async (user) => {
         try {
           const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(user.id)
-          return { ...user, email: authUser?.user?.email || null }
+          const isSuperAdminUser = await isSuperAdmin(user.id)
+          return { ...user, email: authUser?.user?.email || null, is_super_admin: isSuperAdminUser }
         } catch {
-          return { ...user, email: null }
+          const isSuperAdminUser = await isSuperAdmin(user.id)
+          return { ...user, email: null, is_super_admin: isSuperAdminUser }
         }
       })
     )
@@ -301,11 +323,16 @@ const getUserById = async (req, res) => {
       return res.status(404).json({ error: 'User not found' })
     }
 
-    // Fetch email from auth
+    // Fetch email from auth and check if user is super admin
     let email = null
+    let isSuperAdminUser = false
     try {
       const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(id)
       email = authUser?.user?.email || null
+    } catch {}
+    
+    try {
+      isSuperAdminUser = await isSuperAdmin(id)
     } catch {}
 
     // Fetch login activity
@@ -333,7 +360,7 @@ const getUserById = async (req, res) => {
       .limit(20)
 
     res.json({
-      user: { ...user, email },
+      user: { ...user, email, is_super_admin: isSuperAdminUser },
       loginActivity: loginActivity || [],
       securityEvents: securityEvents || [],
       notifications: notifications || [],
@@ -361,6 +388,15 @@ const suspendUser = async (req, res) => {
 
     if (fetchError || !user) {
       return res.status(404).json({ error: 'User not found' })
+    }
+
+    // Check if target user is a super admin
+    const targetIsSuperAdmin = await isSuperAdmin(id)
+    const requesterIsSuperAdmin = req.admin.role === 'super_admin'
+
+    // Prevent non-super-admins from suspending super admins
+    if (targetIsSuperAdmin && !requesterIsSuperAdmin) {
+      return res.status(403).json({ error: 'You cannot suspend a super admin' })
     }
 
     const { error } = await supabaseAdmin
@@ -530,6 +566,12 @@ const deleteUser = async (req, res) => {
 
     if (fetchError || !user) {
       return res.status(404).json({ error: 'User not found' })
+    }
+
+    // Prevent deletion of super admins
+    const targetIsSuperAdmin = await isSuperAdmin(id)
+    if (targetIsSuperAdmin) {
+      return res.status(403).json({ error: 'Cannot delete a super admin' })
     }
 
     const { error } = await supabaseAdmin

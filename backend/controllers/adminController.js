@@ -1,7 +1,32 @@
 const { supabaseAdmin } = require('../config/supabase')
 const { logAdminActivity } = require('../utils/logger')
 const { sendEmail } = require('../config/email')
-const { accountCreatedTemplate } = require('../utils/emailTemplates')
+const { accountCreatedTemplate, adminPasswordResetTemplate } = require('../utils/emailTemplates')
+
+/**
+ * Generate a random password
+ */
+const generateRandomPassword = (length = 12) => {
+  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const lowercase = 'abcdefghijklmnopqrstuvwxyz'
+  const numbers = '0123456789'
+  const symbols = '!@#$%&*'
+  const all = uppercase + lowercase + numbers + symbols
+
+  // Ensure at least one of each type
+  let password = ''
+  password += uppercase[Math.floor(Math.random() * uppercase.length)]
+  password += lowercase[Math.floor(Math.random() * lowercase.length)]
+  password += numbers[Math.floor(Math.random() * numbers.length)]
+  password += symbols[Math.floor(Math.random() * symbols.length)]
+
+  for (let i = password.length; i < length; i++) {
+    password += all[Math.floor(Math.random() * all.length)]
+  }
+
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('')
+}
 
 /**
  * GET /api/admin/dashboard
@@ -221,9 +246,131 @@ const createAdmin = async (req, res) => {
   }
 }
 
+/**
+ * GET /api/admin/admins
+ * List all admin users (Super Admin only)
+ */
+const getAdmins = async (req, res) => {
+  try {
+    const { page = 0, limit = 50, role, search } = req.query
+    const offset = parseInt(page) * parseInt(limit)
+
+    let query = supabaseAdmin
+      .from('admin_profiles')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + parseInt(limit) - 1)
+
+    if (role && role !== 'all') {
+      query = query.eq('role', role)
+    }
+
+    if (search) {
+      query = query.or(
+        `email.ilike.%${search}%,first_name.ilike.%${search}%,last_name.ilike.%${search}%`
+      )
+    }
+
+    const { data, count, error } = await query
+
+    if (error) {
+      return res.status(400).json({ error: error.message })
+    }
+
+    res.json({
+      admins: data || [],
+      total: count || 0,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil((count || 0) / parseInt(limit)),
+    })
+  } catch (err) {
+    console.error('Get admins error:', err)
+    res.status(500).json({ error: 'Failed to fetch admins' })
+  }
+}
+
+/**
+ * PATCH /api/admin/reset-password/:adminId
+ * Reset admin password (Super Admin only)
+ */
+const resetAdminPassword = async (req, res) => {
+  try {
+    const { adminId } = req.params
+    const { password, generate_password } = req.body
+
+    // Check if admin exists
+    const { data: targetAdmin, error: fetchError } = await supabaseAdmin
+      .from('admin_profiles')
+      .select('*')
+      .eq('id', adminId)
+      .single()
+
+    if (fetchError || !targetAdmin) {
+      return res.status(404).json({ error: 'Admin not found' })
+    }
+
+    // Use provided password (frontend generates it if generate_password is true)
+    // If generate_password is true but no password provided, generate one
+    let newPassword = password
+    if (generate_password && !password) {
+      newPassword = generateRandomPassword()
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' })
+    }
+
+    // Update password using Supabase Admin API
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(adminId, {
+      password: newPassword,
+    })
+
+    if (updateError) {
+      return res.status(400).json({ error: `Failed to update password: ${updateError.message}` })
+    }
+
+    // Log the password reset activity
+    await logAdminActivity(req.admin.id, 'admin_password_reset', {
+      target_type: 'admin',
+      target_id: adminId,
+      ip: req.ip,
+      extra: {
+        target_admin_email: targetAdmin.email,
+        password_generated: generate_password || !password,
+      },
+    })
+
+    // Send email with new password via SendGrid
+    try {
+      const template = adminPasswordResetTemplate(targetAdmin.email, newPassword)
+      const emailResult = await sendEmail(targetAdmin.email, template.subject, template.html)
+      
+      if (!emailResult.success) {
+        console.error('Failed to send password reset email:', emailResult.error)
+        // Continue even if email fails - password is still reset
+      }
+    } catch (emailErr) {
+      console.error('Failed to send password reset email:', emailErr)
+      // Don't fail the request if email fails - password is still reset
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully. Email sent with new password via SendGrid.',
+      password: newPassword, // Always return password so admin can see it
+    })
+  } catch (err) {
+    console.error('Reset admin password error:', err)
+    res.status(500).json({ error: 'Failed to reset password' })
+  }
+}
+
 module.exports = {
   getDashboardStats,
   getActivityLog,
   getSecurityEvents,
   createAdmin,
+  getAdmins,
+  resetAdminPassword,
 }

@@ -52,6 +52,7 @@ const UserDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { adminProfile, rolePrefix } = useAuth()
+  const isCurrentUserSuperAdmin = adminProfile?.role === 'super_admin'
 
   const [user, setUser] = useState(null)
   const [loginActivity, setLoginActivity] = useState([])
@@ -333,7 +334,8 @@ const UserDetail = () => {
               </CButton>
 
               {/* Suspend / Unsuspend */}
-              {user.account_status === 'active' && (
+              {/* Only show suspend/unsuspend for super admins if current user is also super admin */}
+              {user.account_status === 'active' && (!user.is_super_admin || isCurrentUserSuperAdmin) && (
                 <CButton
                   color="warning"
                   size="sm"
@@ -350,7 +352,7 @@ const UserDetail = () => {
                   <CIcon icon={cilBan} size="sm" /> Suspend
                 </CButton>
               )}
-              {user.account_status === 'suspended' && (
+              {user.account_status === 'suspended' && (!user.is_super_admin || isCurrentUserSuperAdmin) && (
                 <CButton
                   color="success"
                   size="sm"
@@ -387,7 +389,8 @@ const UserDetail = () => {
               </CButton>
 
               {/* Delete */}
-              {user.account_status !== 'deleted' && (
+              {/* Hide delete button for super admins */}
+              {user.account_status !== 'deleted' && !user.is_super_admin && (
                 <CButton
                   color="danger"
                   size="sm"

@@ -63,8 +63,30 @@ const passwordResetTemplate = (email, resetLink) => ({
   `,
 })
 
+const adminPasswordResetTemplate = (email, newPassword) => ({
+  subject: 'Your Admin Password Has Been Reset',
+  html: `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%); padding: 30px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: #fff; margin: 0; font-size: 24px;">Password Reset</h1>
+      </div>
+      <div style="background: #f8fafc; padding: 30px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;">
+        <p style="color: #334155; font-size: 16px;">Hello,</p>
+        <p style="color: #334155; font-size: 16px;">Your admin account password has been reset by an administrator.</p>
+        <div style="background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 20px 0;">
+          <p style="margin: 5px 0; color: #64748b;"><strong>Email:</strong> ${email}</p>
+          <p style="margin: 5px 0; color: #64748b;"><strong>New Password:</strong> <code style="background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 14px;">${newPassword}</code></p>
+        </div>
+        <p style="color: #64748b; font-size: 14px;">Please log in with this password and change it immediately for security purposes.</p>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 30px;">— The Outbond Team</p>
+      </div>
+    </div>
+  `,
+})
+
 module.exports = {
   accountCreatedTemplate,
   accountSuspendedTemplate,
   passwordResetTemplate,
+  adminPasswordResetTemplate,
 }

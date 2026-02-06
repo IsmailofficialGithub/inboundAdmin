@@ -50,6 +50,7 @@ const UsersList = () => {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { adminProfile, rolePrefix } = useAuth()
+  const isCurrentUserSuperAdmin = adminProfile?.role === 'super_admin'
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '')
@@ -471,7 +472,8 @@ const UsersList = () => {
                                 </CTooltip>
 
                                 {/* Suspend / Unsuspend */}
-                                {user.account_status === 'active' && (
+                                {/* Only show suspend/unsuspend for super admins if current user is also super admin */}
+                                {user.account_status === 'active' && (!user.is_super_admin || isCurrentUserSuperAdmin) && (
                                   <CTooltip content="Suspend user">
                                     <CButton
                                       color="warning"
@@ -486,7 +488,7 @@ const UsersList = () => {
                                     </CButton>
                                   </CTooltip>
                                 )}
-                                {user.account_status === 'suspended' && (
+                                {user.account_status === 'suspended' && (!user.is_super_admin || isCurrentUserSuperAdmin) && (
                                   <CTooltip content="Unsuspend user">
                                     <CButton
                                       color="success"
@@ -503,7 +505,8 @@ const UsersList = () => {
                                 )}
 
                                 {/* Delete */}
-                                {user.account_status !== 'deleted' && (
+                                {/* Hide delete button for super admins */}
+                                {user.account_status !== 'deleted' && !user.is_super_admin && (
                                   <CTooltip content="Delete user">
                                     <CButton
                                       color="danger"

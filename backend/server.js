@@ -110,6 +110,8 @@ app.listen(PORT, () => {
   console.log(`  GET    /api/admin/activity-log`)
   console.log(`  GET    /api/admin/security-events`)
   console.log(`  POST   /api/admin/create-admin`)
+  console.log(`  GET    /api/admin/admins`)
+  console.log(`  PATCH  /api/admin/reset-password/:adminId`)
   console.log(`  GET    /api/health\n`)
 })
 

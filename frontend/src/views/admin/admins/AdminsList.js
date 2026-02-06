@@ -215,6 +215,61 @@ const AdminsList = () => {
   }
 
   // =====================
+  // RESET PASSWORD
+  // =====================
+  const openResetPasswordModal = (admin) => {
+    const pw = generatePassword()
+    setResetPwForm({
+      password: pw,
+      generate_password: true,
+    })
+    setResetPwGenerated(pw)
+    setResetPwModal({ visible: true, admin })
+  }
+
+  const regenerateResetPassword = () => {
+    const pw = generatePassword()
+    setResetPwGenerated(pw)
+    setResetPwForm((prev) => ({ ...prev, password: pw }))
+  }
+
+  const handleResetPassword = async () => {
+    if (!resetPwModal.admin) return
+
+    setResetPwLoading(true)
+    try {
+      // Always send the password - either generated or manually entered
+      const passwordToSend = resetPwForm.generate_password ? resetPwGenerated : resetPwForm.password
+
+      if (!passwordToSend || passwordToSend.length < 8) {
+        setAlert({ color: 'danger', message: 'Password must be at least 8 characters long' })
+        setResetPwLoading(false)
+        return
+      }
+
+      const payload = {
+        password: passwordToSend,
+        generate_password: resetPwForm.generate_password,
+      }
+
+      const result = await adminAPI.resetAdminPassword(resetPwModal.admin.id, payload)
+      
+      // Show success message
+      setAlert({
+        color: 'success',
+        message: result.message || 'Password reset successfully. Email sent with new password via SendGrid.',
+      })
+      setResetPwModal({ visible: false, admin: null })
+      setResetPwForm({ password: '', generate_password: true })
+      setResetPwGenerated('')
+    } catch (err) {
+      setAlert({ color: 'danger', message: err.message || 'Failed to reset password' })
+    } finally {
+      setResetPwLoading(false)
+    }
+  }
+
+  // =====================
   // FORCE LOGOUT
   // =====================
   const handleForceLogout = async () => {
