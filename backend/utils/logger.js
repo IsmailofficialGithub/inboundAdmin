@@ -1,11 +1,11 @@
-const { supabase } = require('../config/supabase')
+const { supabaseAdmin } = require('../config/supabase')
 
 /**
  * Log admin activity to the admin_activity_log table
  */
 const logAdminActivity = async (adminId, action, details = {}) => {
   try {
-    await supabase.from('admin_activity_log').insert({
+    await supabaseAdmin.from('admin_activity_log').insert({
       admin_id: adminId,
       action,
       target_type: details.target_type || null,

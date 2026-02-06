@@ -1,4 +1,4 @@
-const { supabase, supabaseAdmin } = require('../config/supabase')
+const { supabaseAdmin } = require('../config/supabase')
 const { logAdminActivity } = require('../utils/logger')
 const { sendEmail } = require('../config/email')
 const { accountCreatedTemplate } = require('../utils/emailTemplates')
@@ -10,38 +10,38 @@ const { accountCreatedTemplate } = require('../utils/emailTemplates')
 const getDashboardStats = async (req, res) => {
   try {
     // Total users
-    const { count: totalUsers } = await supabase
+    const { count: totalUsers } = await supabaseAdmin
       .from('user_profiles')
       .select('*', { count: 'exact', head: true })
 
     // Active users
-    const { count: activeUsers } = await supabase
+    const { count: activeUsers } = await supabaseAdmin
       .from('user_profiles')
       .select('*', { count: 'exact', head: true })
       .eq('account_status', 'active')
 
     // Suspended users
-    const { count: suspendedUsers } = await supabase
+    const { count: suspendedUsers } = await supabaseAdmin
       .from('user_profiles')
       .select('*', { count: 'exact', head: true })
       .eq('account_status', 'suspended')
 
     // Security events (last 24h)
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const { count: recentSecurityEvents } = await supabase
+    const { count: recentSecurityEvents } = await supabaseAdmin
       .from('security_events')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', oneDayAgo)
 
     // Recent admin activity
-    const { data: recentActivity } = await supabase
+    const { data: recentActivity } = await supabaseAdmin
       .from('admin_activity_log')
       .select('*, admin_profiles(email, first_name, last_name)')
       .order('created_at', { ascending: false })
       .limit(10)
 
     // Recently registered users
-    const { data: recentUsersRaw } = await supabase
+    const { data: recentUsersRaw } = await supabaseAdmin
       .from('user_profiles')
       .select('*')
       .order('created_at', { ascending: false })
@@ -84,7 +84,7 @@ const getActivityLog = async (req, res) => {
     const { page = 0, limit = 50 } = req.query
     const offset = parseInt(page) * parseInt(limit)
 
-    const { data, count, error } = await supabase
+    const { data, count, error } = await supabaseAdmin
       .from('admin_activity_log')
       .select('*, admin_profiles(email, first_name, last_name)', { count: 'exact' })
       .order('created_at', { ascending: false })
@@ -116,7 +116,7 @@ const getSecurityEvents = async (req, res) => {
     const { page = 0, limit = 50, severity } = req.query
     const offset = parseInt(page) * parseInt(limit)
 
-    let query = supabase
+    let query = supabaseAdmin
       .from('security_events')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
@@ -174,7 +174,7 @@ const createAdmin = async (req, res) => {
     }
 
     // Create admin profile
-    const { error: profileError } = await supabase.from('admin_profiles').insert({
+    const { error: profileError } = await supabaseAdmin.from('admin_profiles').insert({
       id: authData.user.id,
       email,
       first_name: first_name || null,

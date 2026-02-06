@@ -66,8 +66,10 @@ app.get('/api/health', (req, res) => {
   })
 })
 
-// Auth routes (login has stricter rate limit)
-app.use('/api/auth', authLimiter, authRoutes)
+// Auth routes — login/refresh have stricter rate limit, /me and /logout use general limiter
+app.use('/api/auth/login', authLimiter)
+app.use('/api/auth/refresh', authLimiter)
+app.use('/api/auth', apiLimiter, authRoutes)
 
 // User management routes
 app.use('/api/users', apiLimiter, userRoutes)
@@ -96,7 +98,9 @@ app.listen(PORT, () => {
   console.log(`  GET    /api/auth/me`)
   console.log(`  POST   /api/auth/refresh`)
   console.log(`  GET    /api/users`)
+  console.log(`  POST   /api/users              (create user + send email)`)
   console.log(`  GET    /api/users/:id`)
+  console.log(`  PUT    /api/users/:id           (update user)`)
   console.log(`  PATCH  /api/users/:id/suspend`)
   console.log(`  PATCH  /api/users/:id/unsuspend`)
   console.log(`  PATCH  /api/users/:id/reset-email-verification`)

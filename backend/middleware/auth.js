@@ -1,4 +1,4 @@
-const { supabase } = require('../config/supabase')
+const { supabase, supabaseAdmin } = require('../config/supabase')
 
 /**
  * Authenticate admin via Supabase JWT token
@@ -23,8 +23,8 @@ const authenticate = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid or expired token' })
     }
 
-    // Fetch admin profile
-    const { data: adminProfile, error: profileError } = await supabase
+    // Fetch admin profile using service role client (bypasses RLS)
+    const { data: adminProfile, error: profileError } = await supabaseAdmin
       .from('admin_profiles')
       .select('*')
       .eq('id', user.id)

@@ -1,4 +1,4 @@
-const { supabase } = require('../config/supabase')
+const { supabase, supabaseAdmin } = require('../config/supabase')
 const { logAdminActivity } = require('../utils/logger')
 
 /**
