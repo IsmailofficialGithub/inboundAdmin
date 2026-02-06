@@ -10,6 +10,26 @@ const UserDetail = React.lazy(() => import('./views/admin/users/UserDetail'))
 const ActivityLog = React.lazy(() => import('./views/admin/activity/ActivityLog'))
 const AdminsList = React.lazy(() => import('./views/admin/admins/AdminsList'))
 
+// Voice Agents
+const VoiceAgentsList = React.lazy(() => import('./views/admin/voice-agents/VoiceAgentsList'))
+const VoiceAgentDetail = React.lazy(() => import('./views/admin/voice-agents/VoiceAgentDetail'))
+
+// Calls
+const CallsList = React.lazy(() => import('./views/admin/calls/CallsList'))
+const CallDetail = React.lazy(() => import('./views/admin/calls/CallDetail'))
+
+// Credits
+const CreditsList = React.lazy(() => import('./views/admin/credits/CreditsList'))
+const TransactionsList = React.lazy(() => import('./views/admin/credits/TransactionsList'))
+
+// Subscriptions
+const SubscriptionsList = React.lazy(() => import('./views/admin/subscriptions/SubscriptionsList'))
+const PackagesList = React.lazy(() => import('./views/admin/subscriptions/PackagesList'))
+
+// Inbound Numbers
+const InboundNumbersList = React.lazy(() => import('./views/admin/inbound-numbers/InboundNumbersList'))
+const InboundNumberDetail = React.lazy(() => import('./views/admin/inbound-numbers/InboundNumberDetail'))
+
 // ============================================================
 // ORIGINAL TEMPLATE PAGES (kept, not removed)
 // ============================================================
@@ -77,6 +97,26 @@ const routes = [
   { path: 'users/:id', name: 'User Detail', element: UserDetail },
   { path: 'admins', name: 'Admins', element: AdminsList, requiredRoles: ['super_admin'] },
   { path: 'activity-log', name: 'Activity Log', element: ActivityLog },
+
+  // Voice Agents
+  { path: 'voice-agents', name: 'Voice Agents', element: VoiceAgentsList, exact: true },
+  { path: 'voice-agents/:id', name: 'Agent Detail', element: VoiceAgentDetail },
+
+  // Calls & Recordings
+  { path: 'calls', name: 'Call History', element: CallsList, exact: true },
+  { path: 'calls/:id', name: 'Call Detail', element: CallDetail },
+
+  // Credits & Transactions
+  { path: 'credits', name: 'User Credits', element: CreditsList, exact: true },
+  { path: 'transactions', name: 'Transactions', element: TransactionsList },
+
+  // Subscriptions & Packages
+  { path: 'subscriptions', name: 'Subscriptions', element: SubscriptionsList, exact: true },
+  { path: 'packages', name: 'Packages', element: PackagesList },
+
+  // Inbound Numbers
+  { path: 'inbound-numbers', name: 'Inbound Numbers', element: InboundNumbersList, exact: true },
+  { path: 'inbound-numbers/:id', name: 'Number Detail', element: InboundNumberDetail },
 
   // ============================================================
   // ORIGINAL TEMPLATE ROUTES (kept for reference, still accessible)

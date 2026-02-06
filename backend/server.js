@@ -12,6 +12,11 @@ const { errorHandler, notFoundHandler } = require('./middleware/errorHandler')
 const authRoutes = require('./routes/auth')
 const userRoutes = require('./routes/users')
 const adminRoutes = require('./routes/admin')
+const voiceAgentsRoutes = require('./routes/voiceAgents')
+const callsRoutes = require('./routes/calls')
+const creditsRoutes = require('./routes/credits')
+const subscriptionsRoutes = require('./routes/subscriptions')
+const inboundNumbersRoutes = require('./routes/inboundNumbers')
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -77,6 +82,21 @@ app.use('/api/users', apiLimiter, userRoutes)
 // Admin routes (dashboard, activity log, etc.)
 app.use('/api/admin', apiLimiter, adminRoutes)
 
+// Voice agents management
+app.use('/api/voice-agents', apiLimiter, voiceAgentsRoutes)
+
+// Calls & recordings
+app.use('/api/calls', apiLimiter, callsRoutes)
+
+// Credits & transactions
+app.use('/api/credits', apiLimiter, creditsRoutes)
+
+// Subscriptions & packages
+app.use('/api/subscriptions', apiLimiter, subscriptionsRoutes)
+
+// Inbound numbers
+app.use('/api/inbound-numbers', apiLimiter, inboundNumbersRoutes)
+
 // ======================
 // ERROR HANDLING
 // ======================
@@ -112,6 +132,20 @@ app.listen(PORT, () => {
   console.log(`  POST   /api/admin/create-admin`)
   console.log(`  GET    /api/admin/admins`)
   console.log(`  PATCH  /api/admin/reset-password/:adminId`)
+  console.log(`  GET    /api/voice-agents`)
+  console.log(`  GET    /api/voice-agents/:id`)
+  console.log(`  PUT    /api/voice-agents/:id`)
+  console.log(`  DELETE /api/voice-agents/:id`)
+  console.log(`  GET    /api/calls`)
+  console.log(`  GET    /api/calls/:id`)
+  console.log(`  GET    /api/credits`)
+  console.log(`  GET    /api/credits/transactions`)
+  console.log(`  POST   /api/credits/adjust`)
+  console.log(`  GET    /api/subscriptions`)
+  console.log(`  GET    /api/subscriptions/packages`)
+  console.log(`  POST   /api/subscriptions/packages`)
+  console.log(`  GET    /api/inbound-numbers`)
+  console.log(`  GET    /api/inbound-numbers/:id`)
   console.log(`  GET    /api/health\n`)
 })
 

@@ -134,4 +134,116 @@ export const adminAPI = {
     }),
 }
 
+// ========================
+// VOICE AGENTS
+// ========================
+export const voiceAgentsAPI = {
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString()
+    return apiRequest(`/voice-agents?${query}`)
+  },
+  getById: (id) => apiRequest(`/voice-agents/${id}`),
+  update: (id, data) =>
+    apiRequest(`/voice-agents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  delete: (id) =>
+    apiRequest(`/voice-agents/${id}`, {
+      method: 'DELETE',
+    }),
+  activate: (id) =>
+    apiRequest(`/voice-agents/${id}/activate`, {
+      method: 'PATCH',
+    }),
+  deactivate: (id) =>
+    apiRequest(`/voice-agents/${id}/deactivate`, {
+      method: 'PATCH',
+    }),
+}
+
+// ========================
+// CALLS
+// ========================
+export const callsAPI = {
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString()
+    return apiRequest(`/calls?${query}`)
+  },
+  getById: (id) => apiRequest(`/calls/${id}`),
+  getRecordings: (id) => apiRequest(`/calls/${id}/recordings`),
+}
+
+// ========================
+// CREDITS
+// ========================
+export const creditsAPI = {
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString()
+    return apiRequest(`/credits?${query}`)
+  },
+  getTransactions: (params = {}) => {
+    const query = new URLSearchParams(params).toString()
+    return apiRequest(`/credits/transactions?${query}`)
+  },
+  getTransactionById: (id) => apiRequest(`/credits/transactions/${id}`),
+  adjust: (data) =>
+    apiRequest('/credits/adjust', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+}
+
+// ========================
+// SUBSCRIPTIONS
+// ========================
+export const subscriptionsAPI = {
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString()
+    return apiRequest(`/subscriptions?${query}`)
+  },
+  getById: (id) => apiRequest(`/subscriptions/${id}`),
+  update: (id, data) =>
+    apiRequest(`/subscriptions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  getPackages: () => apiRequest('/subscriptions/packages'),
+  createPackage: (data) =>
+    apiRequest('/subscriptions/packages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updatePackage: (id, data) =>
+    apiRequest(`/subscriptions/packages/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  deletePackage: (id) =>
+    apiRequest(`/subscriptions/packages/${id}`, {
+      method: 'DELETE',
+    }),
+}
+
+// ========================
+// INBOUND NUMBERS
+// ========================
+export const inboundNumbersAPI = {
+  list: (params = {}) => {
+    const query = new URLSearchParams(params).toString()
+    return apiRequest(`/inbound-numbers?${query}`)
+  },
+  getById: (id) => apiRequest(`/inbound-numbers/${id}`),
+  update: (id, data) =>
+    apiRequest(`/inbound-numbers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  assign: (id, agentId) =>
+    apiRequest(`/inbound-numbers/${id}/assign`, {
+      method: 'PATCH',
+      body: JSON.stringify({ agent_id: agentId }),
+    }),
+}
+
 export default apiRequest

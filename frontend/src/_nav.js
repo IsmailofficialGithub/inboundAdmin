@@ -18,6 +18,10 @@ import {
   cilUser,
   cilHistory,
   cilSettings,
+  cilMicrophone,
+  cilPhone,
+  cilDollar,
+  cilCreditCard,
 } from '@coreui/icons'
 import { CNavGroup, CNavItem, CNavTitle } from '@coreui/react'
 
@@ -63,6 +67,62 @@ const getNavItems = (rolePrefix = 'admin') => {
       name: 'Activity Log',
       to: `${prefix}/activity-log`,
       icon: <CIcon icon={cilHistory} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavTitle,
+      name: 'Business',
+    },
+    {
+      component: CNavItem,
+      name: 'Voice Agents',
+      to: `${prefix}/voice-agents`,
+      icon: <CIcon icon={cilMicrophone} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavItem,
+      name: 'Call History',
+      to: `${prefix}/calls`,
+      icon: <CIcon icon={cilPhone} customClassName="nav-icon" />,
+    },
+    {
+      component: CNavGroup,
+      name: 'Credits',
+      icon: <CIcon icon={cilDollar} customClassName="nav-icon" />,
+      items: [
+        {
+          component: CNavItem,
+          name: 'User Credits',
+          to: `${prefix}/credits`,
+        },
+        {
+          component: CNavItem,
+          name: 'Transactions',
+          to: `${prefix}/transactions`,
+        },
+      ],
+    },
+    {
+      component: CNavGroup,
+      name: 'Subscriptions',
+      icon: <CIcon icon={cilCreditCard} customClassName="nav-icon" />,
+      items: [
+        {
+          component: CNavItem,
+          name: 'All Subscriptions',
+          to: `${prefix}/subscriptions`,
+        },
+        {
+          component: CNavItem,
+          name: 'Packages',
+          to: `${prefix}/packages`,
+        },
+      ],
+    },
+    {
+      component: CNavItem,
+      name: 'Inbound Numbers',
+      to: `${prefix}/inbound-numbers`,
+      icon: <CIcon icon={cilPhone} customClassName="nav-icon" />,
     },
     {
       component: CNavTitle,
