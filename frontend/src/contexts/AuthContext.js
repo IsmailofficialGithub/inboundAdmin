@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import PropTypes from 'prop-types'
-import { supabase, isSupabaseConfigured } from '../supabase/supabaseClient'
+import { supabase, isSupabaseConfigured, getStoredSession } from '../supabase/supabaseClient'
 import { getRolePrefix } from '../utils/rolePrefix'
+import { authAPI } from '../utils/api'
+import { setAuthToken, getAuthToken, clearAuthToken } from '../utils/cookies'
 
 const AuthContext = createContext(null)
-
-const AUTH_TIMEOUT_MS = 5000 // 5 second timeout for auth initialization
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
@@ -21,104 +21,120 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  // Fetch admin profile from admin_profiles table
-  const fetchAdminProfile = useCallback(async (userId) => {
-    if (!supabase) return null
+  // Fetch admin profile from backend API
+  const fetchAdminProfile = useCallback(async () => {
     try {
-      const { data, error: fetchError } = await supabase
-        .from('admin_profiles')
-        .select('*')
-        .eq('id', userId)
-        .eq('is_active', true)
-        .single()
-
-      if (fetchError || !data) {
-        return null
-      }
-
-      return data
+      const response = await authAPI.getMe()
+      return response.admin || null
     } catch (err) {
-      console.error('Error fetching admin profile:', err)
+      console.warn('Error fetching admin profile from API:', err)
       return null
     }
   }, [])
 
-  // Initialize auth state
+  // Initialize auth state by reading directly from localStorage (fast, never hangs)
+  // then verify with the backend API
   useEffect(() => {
-    // If Supabase is not configured, stop loading immediately
-    if (!isSupabaseConfigured || !supabase) {
+    if (!isSupabaseConfigured) {
       console.warn('⚠️ Supabase not configured — skipping auth initialization.')
       setLoading(false)
       return
     }
 
     let isMounted = true
-    let loadingResolved = false
-
-    // Safety timeout — ensures loading always resolves even if Supabase hangs
-    const timeout = setTimeout(() => {
-      if (isMounted && !loadingResolved) {
-        console.warn('⚠️ Auth initialization timed out. Supabase may be unreachable.')
-        loadingResolved = true
-        setLoading(false)
-      }
-    }, AUTH_TIMEOUT_MS)
 
     const initAuth = async () => {
       try {
-        const {
-          data: { session: currentSession },
-        } = await supabase.auth.getSession()
+        // First check cookie (primary source)
+        const cookieToken = getAuthToken()
 
-        if (!isMounted) return
+        // Also check localStorage as fallback (for migration)
+        const storedSession = getStoredSession()
+        const localStorageToken = storedSession?.access_token
 
-        if (currentSession) {
-          setSession(currentSession)
-          const profile = await fetchAdminProfile(currentSession.user.id)
+        // Use cookie token if available, otherwise fallback to localStorage
+        const token = cookieToken || localStorageToken
+
+        if (token) {
+          // If we have localStorage token but no cookie, migrate it to cookie
+          if (localStorageToken && !cookieToken) {
+            setAuthToken(localStorageToken)
+          }
+
+          // Create a session object from the token for Supabase compatibility
+          const sessionObj = storedSession || { access_token: token }
+
+          // Verify token with the backend
+          setSession(sessionObj)
+          const profile = await fetchAdminProfile()
           if (!isMounted) return
+
           if (profile) {
             setAdminProfile(profile)
-            // Update last_login_at
-            await supabase
-              .from('admin_profiles')
-              .update({ last_login_at: new Date().toISOString() })
-              .eq('id', currentSession.user.id)
           } else {
-            // Not an admin — sign them out
-            await supabase.auth.signOut()
+            // Token is invalid or user is not an admin — clear everything
             setSession(null)
+            setAdminProfile(null)
+            clearAuthToken()
+            // Clean up the invalid session from Supabase storage
+            if (supabase) {
+              supabase.auth.signOut().catch(() => {})
+            }
           }
         }
+        // If no token, user needs to log in (loading will just stop)
       } catch (err) {
         console.error('Auth initialization error:', err)
       } finally {
-        if (isMounted && !loadingResolved) {
-          loadingResolved = true
-          setLoading(false)
-          clearTimeout(timeout)
-        }
+        if (isMounted) setLoading(false)
       }
     }
 
     initAuth()
 
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      if (!isMounted) return
-      setSession(newSession)
-      if (newSession) {
-        const profile = await fetchAdminProfile(newSession.user.id)
-        if (isMounted) setAdminProfile(profile)
-      } else {
-        setAdminProfile(null)
-      }
-    })
+    // Listen for auth state changes (login, logout, token refresh)
+    // This handles events AFTER the initial load
+    let subscription = null
+    if (supabase) {
+      const {
+        data: { subscription: sub },
+      } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+        if (!isMounted) return
+
+        // Skip initial session — we already handled it above via localStorage
+        if (event === 'INITIAL_SESSION') return
+
+        // Token refreshed — update session and cookie silently
+        if (event === 'TOKEN_REFRESHED') {
+          setSession(newSession)
+          if (newSession?.access_token) {
+            setAuthToken(newSession.access_token)
+          }
+          return
+        }
+
+        // Explicit sign in (from login form)
+        if (event === 'SIGNED_IN') {
+          setSession(newSession)
+          if (newSession?.access_token) {
+            setAuthToken(newSession.access_token)
+          }
+          return
+        }
+
+        // Sign out
+        if (event === 'SIGNED_OUT') {
+          clearAuthToken()
+          setSession(null)
+          setAdminProfile(null)
+          return
+        }
+      })
+      subscription = sub
+    }
 
     return () => {
       isMounted = false
-      clearTimeout(timeout)
       subscription?.unsubscribe()
     }
   }, [fetchAdminProfile])
@@ -143,29 +159,26 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: signInError.message }
       }
 
-      // Check if user is an admin
-      const profile = await fetchAdminProfile(data.user.id)
+      // Set session first
+      setSession(data.session)
+
+      // Store token in cookie for future requests
+      if (data.session?.access_token) {
+        setAuthToken(data.session.access_token)
+      }
+
+      // Verify admin status via backend API
+      const profile = await fetchAdminProfile()
       if (!profile) {
         await supabase.auth.signOut()
+        setSession(null)
+        clearAuthToken()
         const msg = 'Access denied. You are not authorized as an admin.'
         setError(msg)
         return { success: false, error: msg }
       }
 
       setAdminProfile(profile)
-
-      // Update last_login_at
-      await supabase
-        .from('admin_profiles')
-        .update({ last_login_at: new Date().toISOString() })
-        .eq('id', data.user.id)
-
-      // Log the login activity
-      await supabase.from('admin_activity_log').insert({
-        admin_id: data.user.id,
-        action: 'admin_login',
-        details: { email },
-      })
 
       return { success: true, rolePrefix: getRolePrefix(profile.role) }
     } catch (err) {
@@ -186,6 +199,8 @@ export const AuthProvider = ({ children }) => {
       if (supabase) {
         await supabase.auth.signOut()
       }
+      // Clear cookie
+      clearAuthToken()
       setSession(null)
       setAdminProfile(null)
     } catch (err) {

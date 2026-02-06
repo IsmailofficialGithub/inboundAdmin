@@ -19,6 +19,34 @@ if (!isSupabaseConfigured) {
   )
 }
 
+// Extract the project ref from the URL for localStorage key
+const projectRef = supabaseUrl ? new URL(supabaseUrl).hostname.split('.')[0] : null
+const storageKey = projectRef ? `sb-${projectRef}-auth-token` : null
+
+/**
+ * Read the stored session directly from localStorage.
+ * This bypasses the Supabase client which can hang during token refresh.
+ */
+export const getStoredSession = () => {
+  if (!storageKey) return null
+  try {
+    const raw = localStorage.getItem(storageKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Get the access token directly from localStorage (fast, never hangs).
+ */
+export const getStoredAccessToken = () => {
+  const session = getStoredSession()
+  return session?.access_token || null
+}
+
 // Create the client even with invalid credentials (it won't crash),
 // but callers should check isSupabaseConfigured before making API calls.
 export const supabase = isSupabaseConfigured

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import {
   CAlert,
   CButton,
@@ -23,29 +24,40 @@ const Login = () => {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const { login, isAuthenticated, rolePrefix, isSupabaseConfigured } = useAuth()
+  const { login, isSupabaseConfigured, loading: authLoading, isAuthenticated, rolePrefix } = useAuth()
   const navigate = useNavigate()
 
-  React.useEffect(() => {
-    if (isAuthenticated && rolePrefix) {
-      navigate(`/${rolePrefix}/dashboard`, { replace: true })
-    }
-  }, [isAuthenticated, rolePrefix, navigate])
+  // If already authenticated, redirect to dashboard
+  if (!authLoading && isAuthenticated && rolePrefix) {
+    return <Navigate to={`/${rolePrefix}/dashboard`} replace />
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
 
-    const result = await login(email, password)
+    try {
+      const result = await login(email, password)
 
-    if (result.success) {
-      navigate(`/${result.rolePrefix}/dashboard`, { replace: true })
-    } else {
-      setError(result.error)
+      if (result.success) {
+        toast.success('Login successful! Redirecting...')
+        // Small delay to show success message
+        setTimeout(() => {
+          navigate(`/${result.rolePrefix}/dashboard`, { replace: true })
+        }, 500)
+      } else {
+        const errorMessage = result.error || 'Login failed. Please try again.'
+        setError(errorMessage)
+        toast.error(errorMessage)
+      }
+    } catch (err) {
+      const errorMessage = err.message || 'An unexpected error occurred. Please try again.'
+      setError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   return (
