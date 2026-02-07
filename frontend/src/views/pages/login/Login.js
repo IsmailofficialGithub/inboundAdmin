@@ -315,7 +315,6 @@ const Login = () => {
                     fontSize: '0.95rem',
                     color: '#1a1a1a',
                   }}
-                  className="text-dark"
                 />
               </CInputGroup>
             </div>
@@ -361,7 +360,6 @@ const Login = () => {
                     fontSize: '0.95rem',
                     color: '#1a1a1a',
                   }}
-                  className="text-dark"
                 />
                 <CInputGroupText
                   onClick={() => setShowPassword(!showPassword)}
