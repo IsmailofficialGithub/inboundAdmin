@@ -1,13 +1,40 @@
 const { supabase, supabaseAdmin } = require('../config/supabase')
 
 /**
+ * Get header value case-insensitively
+ * Production proxies/load balancers often lowercase headers
+ */
+const getHeader = (req, headerName) => {
+  const lowerName = headerName.toLowerCase()
+  // Check common variations
+  return (
+    req.headers[headerName] ||
+    req.headers[lowerName] ||
+    req.headers[headerName.toLowerCase()] ||
+    req.headers[headerName.toUpperCase()]
+  )
+}
+
+/**
  * Authenticate admin via Supabase JWT token
  * Expects: Authorization: Bearer <token>
  */
 const authenticate = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization
+    // Handle case-insensitive headers (production proxies often lowercase headers)
+    const authHeader = getHeader(req, 'authorization')
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // Log for debugging in production
+      if (process.env.NODE_ENV === 'production') {
+        console.error('Auth failed - Missing Authorization header', {
+          hasAuthHeader: !!authHeader,
+          headerValue: authHeader ? 'present but invalid' : 'missing',
+          availableHeaders: Object.keys(req.headers).filter(k => k.toLowerCase().includes('auth')),
+          method: req.method,
+          path: req.path,
+        })
+      }
       return res.status(401).json({ error: 'Missing or invalid authorization header' })
     }
 

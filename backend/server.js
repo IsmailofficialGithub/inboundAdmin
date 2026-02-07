@@ -33,8 +33,19 @@ const PORT = process.env.PORT || 3011
 // MIDDLEWARE
 // ======================
 
-// Security headers
-app.use(helmet())
+// Trust proxy - important for production environments behind reverse proxy/load balancer
+// This ensures req.ip and req.headers are correctly set
+if (process.env.NODE_ENV === 'production' || process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', true)
+}
+
+// Security headers - configure to allow Authorization header
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: false, // Disable if causing issues with API responses
+  })
+)
 
 // CORS
 app.use(
@@ -42,12 +53,32 @@ app.use(
     origin: process.env.FRONTEND_URL || 'http://localhost:3010',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'authorization', 'X-Requested-With'],
+    exposedHeaders: ['Authorization'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   })
 )
 
 // Request logging
 app.use(morgan('dev'))
+
+// Debug middleware for production - log Authorization header issues
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    // Only log API requests that require auth
+    if (req.path.startsWith('/api/') && !req.path.includes('/auth/login') && !req.path.includes('/health')) {
+      const authHeader = req.headers.authorization || req.headers.Authorization || req.headers['authorization'] || req.headers['Authorization']
+      if (!authHeader) {
+        console.warn(`[AUTH DEBUG] Missing Authorization header on ${req.method} ${req.path}`, {
+          headers: Object.keys(req.headers).filter(k => k.toLowerCase().includes('auth')),
+          ip: req.ip,
+        })
+      }
+    }
+    next()
+  })
+}
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }))
