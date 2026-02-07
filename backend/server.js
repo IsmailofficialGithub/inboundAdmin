@@ -27,7 +27,7 @@ const reportsRoutes = require('./routes/reports')
 const securityRoutes = require('./routes/security')
 
 const app = express()
-const PORT = process.env.PORT || 3020
+const PORT = process.env.PORT || 3011
 
 // ======================
 // MIDDLEWARE
