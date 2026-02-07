@@ -44,6 +44,7 @@ const TicketDetail = React.lazy(() => import('./views/admin/support/TicketDetail
 const FeatureFlags = React.lazy(() => import('./views/admin/settings/FeatureFlags'))
 const SystemSettings = React.lazy(() => import('./views/admin/settings/SystemSettings'))
 const KYCModeration = React.lazy(() => import('./views/admin/kyc/KYCModeration'))
+const KYCUserDetail = React.lazy(() => import('./views/admin/kyc/KYCUserDetail'))
 
 // Reports
 const Reports = React.lazy(() => import('./views/admin/reports/Reports'))
@@ -150,6 +151,7 @@ const routes = [
   { path: 'settings/feature-flags', name: 'Feature Flags', element: FeatureFlags, requiredRoles: ['super_admin'] },
   { path: 'settings/system', name: 'System Settings', element: SystemSettings, requiredRoles: ['super_admin'] },
   { path: 'kyc', name: 'KYC Moderation', element: KYCModeration, requiredRoles: ['super_admin', 'support', 'ops'] },
+  { path: 'kyc/users/:id', name: 'KYC User Detail', element: KYCUserDetail, requiredRoles: ['super_admin', 'support', 'ops'] },
 
   // Reports & Exports
   { path: 'reports', name: 'Reports & Exports', element: Reports },
