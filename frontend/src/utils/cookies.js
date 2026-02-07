@@ -76,10 +76,33 @@ export const setAuthToken = (token) => {
 
 /**
  * Get the auth token from cookie
+ * Checks both auth_token (custom) and sb-auth-token (Supabase format)
  * @returns {string|null} Access token or null if not found
  */
 export const getAuthToken = () => {
-  return getCookie(COOKIE_NAME)
+  // First check our custom auth_token cookie
+  const customToken = getCookie(COOKIE_NAME)
+  if (customToken) {
+    return customToken
+  }
+  
+  // Fallback to Supabase's sb-auth-token cookie (JSON format)
+  const sbAuthToken = getCookie('sb-auth-token')
+  if (sbAuthToken) {
+    try {
+      // Parse the JSON object and extract access_token
+      const sessionData = JSON.parse(sbAuthToken)
+      if (sessionData && sessionData.access_token) {
+        return sessionData.access_token
+      }
+    } catch (e) {
+      // If parsing fails, try to use the cookie value directly as token
+      // (in case it's just the token string, not JSON)
+      return sbAuthToken
+    }
+  }
+  
+  return null
 }
 
 /**

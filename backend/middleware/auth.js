@@ -16,29 +16,101 @@ const getHeader = (req, headerName) => {
 }
 
 /**
+ * Parse cookies from request
+ * @param {object} req - Express request object
+ * @returns {object} Parsed cookies object
+ */
+const parseCookies = (req) => {
+  const cookies = {}
+  const cookieHeader = req.headers.cookie || req.headers.Cookie || ''
+  
+  if (cookieHeader) {
+    cookieHeader.split(';').forEach((cookie) => {
+      const parts = cookie.trim().split('=')
+      if (parts.length === 2) {
+        const name = parts[0].trim()
+        let value = parts[1].trim()
+        // Decode URL-encoded values
+        try {
+          value = decodeURIComponent(value)
+        } catch (e) {
+          // If decoding fails, use original value
+        }
+        cookies[name] = value
+      }
+    })
+  }
+  
+  return cookies
+}
+
+/**
+ * Extract token from cookies
+ * Handles both sb-auth-token (Supabase format) and auth_token (custom format)
+ * @param {object} req - Express request object
+ * @returns {string|null} Token or null if not found
+ */
+const getTokenFromCookies = (req) => {
+  const cookies = parseCookies(req)
+  
+  // Check for auth_token cookie (our custom format - just the token)
+  if (cookies.auth_token) {
+    return cookies.auth_token
+  }
+  
+  // Check for sb-auth-token (Supabase format - JSON object with access_token)
+  if (cookies['sb-auth-token']) {
+    try {
+      const sessionData = JSON.parse(cookies['sb-auth-token'])
+      if (sessionData && sessionData.access_token) {
+        return sessionData.access_token
+      }
+    } catch (e) {
+      // If parsing fails, try to use the cookie value directly as token
+      // (in case it's just the token string, not JSON)
+      return cookies['sb-auth-token']
+    }
+  }
+  
+  return null
+}
+
+/**
  * Authenticate admin via Supabase JWT token
  * Expects: Authorization: Bearer <token>
  */
 const authenticate = async (req, res, next) => {
   try {
-    // Handle case-insensitive headers (production proxies often lowercase headers)
-    const authHeader = getHeader(req, 'authorization')
+    let token = null
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // First, try to get token from Authorization header
+    const authHeader = getHeader(req, 'authorization')
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1]
+    }
+    
+    // If no token in header, try to get from cookies (for production environments)
+    if (!token) {
+      token = getTokenFromCookies(req)
+    }
+    
+    // If still no token, return error
+    if (!token) {
       // Log for debugging in production
       if (process.env.NODE_ENV === 'production') {
-        console.error('Auth failed - Missing Authorization header', {
+        const cookies = parseCookies(req)
+        console.error('Auth failed - Missing token', {
           hasAuthHeader: !!authHeader,
-          headerValue: authHeader ? 'present but invalid' : 'missing',
-          availableHeaders: Object.keys(req.headers).filter(k => k.toLowerCase().includes('auth')),
+          hasCookies: Object.keys(cookies).length > 0,
+          cookieNames: Object.keys(cookies),
+          hasAuthTokenCookie: !!cookies.auth_token,
+          hasSbAuthTokenCookie: !!cookies['sb-auth-token'],
           method: req.method,
           path: req.path,
         })
       }
       return res.status(401).json({ error: 'Missing or invalid authorization header' })
     }
-
-    const token = authHeader.split(' ')[1]
 
     // Verify the token with Supabase
     const {
