@@ -18,10 +18,12 @@ export const setCookie = (name, value, days = 7, options = {}) => {
 
   let cookieString = `${name}=${value}; expires=${expires.toUTCString()}; path=/`
 
-  // Add secure flag in production (HTTPS only)
-  if (import.meta.env.PROD) {
-    cookieString += '; secure'
-  }
+  // Add secure flag only if using HTTPS
+  // Note: Removed automatic secure flag in production to support HTTP deployments
+  // If you're using HTTPS, uncomment the line below:
+  // if (window.location.protocol === 'https:') {
+  //   cookieString += '; secure'
+  // }
 
   // Add SameSite to prevent CSRF
   cookieString += '; SameSite=Lax'
@@ -61,9 +63,6 @@ export const getCookie = (name) => {
  */
 export const deleteCookie = (name) => {
   document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`
-  if (import.meta.env.PROD) {
-    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure`
-  }
 }
 
 /**
@@ -85,7 +84,7 @@ export const getAuthToken = () => {
   if (customToken) {
     return customToken
   }
-  
+
   // Fallback to Supabase's sb-auth-token cookie (JSON format)
   const sbAuthToken = getCookie('sb-auth-token')
   if (sbAuthToken) {
@@ -101,7 +100,7 @@ export const getAuthToken = () => {
       return sbAuthToken
     }
   }
-  
+
   return null
 }
 
