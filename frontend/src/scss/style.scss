@@ -1,0 +1,297 @@
+@use "@coreui/coreui/scss/coreui" as * with ( 
+  $enable-deprecation-messages: false,
+);
+@use "@coreui/chartjs/scss/coreui-chartjs";
+@use "vendors/simplebar";
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--cui-tertiary-bg);
+}
+
+#root {
+  min-height: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  min-height: 100%;
+}
+
+.wrapper {
+  width: 100%;
+  padding-inline: var(--cui-sidebar-occupy-start, 0) var(--cui-sidebar-occupy-end, 0);
+  will-change: auto;
+  @include transition(padding .15s);
+}
+
+.header > .container-fluid,
+.sidebar-header {
+  min-height: calc(4rem + 1px); // stylelint-disable-line function-disallowed-list
+}
+
+.sidebar-brand-full {
+  margin-left: 3px;
+}
+
+.sidebar-header {
+  .nav-underline-border {
+    --cui-nav-underline-border-link-padding-x: 1rem;
+    --cui-nav-underline-border-gap: 0;
+  }
+
+  .nav-link {
+    display: flex;
+    align-items: center;
+    min-height: calc(4rem + 1px); // stylelint-disable-line function-disallowed-list
+  }
+}
+
+.sidebar-toggler {
+  margin-inline-start: auto;
+}
+
+.sidebar-narrow,
+.sidebar-narrow-unfoldable:not(:hover) {
+  .sidebar-toggler {
+    margin-inline-end: auto;
+  }
+}
+
+.header > .container-fluid + .container-fluid {
+  min-height: 3rem;
+}
+
+.footer {
+  min-height: calc(3rem + 1px); // stylelint-disable-line function-disallowed-list
+}
+
+@include color-mode(dark) {
+  body {
+    background-color: var(--cui-dark-bg-subtle);
+  }
+
+  .footer {
+    --cui-footer-bg: var(--cui-body-bg);
+  }
+}
+
+// Fix widget stats card height - target card bodies with pb-0 in stats widgets
+.stats-widgets-row .card .card-body.pb-0 {
+  min-height: 100px;
+  padding-bottom: 1rem !important;
+}
+
+// General fix for all widget stats cards with pb-0 class
+.card .card-body.pb-0.d-flex.justify-content-between.align-items-start {
+  min-height: 100px;
+  padding-bottom: 1rem !important;
+}
+
+// Global cursor pointer for clickable elements
+button,
+.btn,
+a,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+label[for],
+select,
+.cursor-pointer,
+.nav-link,
+.dropdown-toggle,
+.dropdown-item,
+.pagination .page-link,
+.list-group-item-action,
+.form-check-input,
+.form-check-label {
+  cursor: pointer !important;
+}
+
+// Update all primary buttons to use #3086FF
+.btn-primary,
+.btn-primary:not(:disabled):not(.disabled):active,
+.btn-primary:not(:disabled):not(.disabled).active,
+.show > .btn-primary.dropdown-toggle,
+button[color="primary"],
+.btn[color="primary"] {
+  background-color: #3086FF !important;
+  border-color: #3086FF !important;
+  color: #fff !important;
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-primary:focus:not(:disabled),
+.btn-primary:not(:disabled):not(.disabled):hover {
+  background-color: #2573e6 !important;
+  border-color: #2573e6 !important;
+  color: #fff !important;
+}
+
+// Update link buttons to use #3086FF
+.btn-link {
+  color: #3086FF !important;
+}
+
+.btn-link:hover,
+.btn-link:focus {
+  color: #2573e6 !important;
+}
+
+// Update primary color in CoreUI components
+.text-primary {
+  color: #3086FF !important;
+}
+
+.bg-primary {
+  background-color: #3086FF !important;
+}
+
+.border-primary {
+  border-color: #3086FF !important;
+}
+
+// Update spinner primary color
+.spinner-border-primary,
+.spinner-grow-primary {
+  color: #3086FF !important;
+}
+
+// Make all input boxes background transparent
+input,
+input[type="email"],
+input[type="password"],
+input[type="text"],
+input[type="tel"],
+input[type="number"],
+input[type="search"],
+input[type="url"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"],
+textarea,
+select,
+.form-control,
+.form-control:focus,
+.form-select {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+// Force dark text in input fields for light mode
+input,
+input[type="email"],
+input[type="password"],
+input[type="text"],
+input[type="tel"],
+input[type="number"],
+input[type="search"],
+input[type="url"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"],
+textarea,
+select,
+.form-control,
+.form-control:focus,
+.form-select {
+  color: #1a1a1a !important;
+}
+
+// Select dropdown styling - black text in light mode
+select,
+.form-select,
+select option,
+.form-select option {
+  color: #000000 !important;
+}
+
+// Ensure input placeholders are visible
+input::placeholder {
+  color: #999 !important;
+  opacity: 1 !important;
+}
+
+// Override dark mode for inputs - white text in dark mode
+@include color-mode(dark) {
+  input,
+  input[type="email"],
+  input[type="password"],
+  input[type="text"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="search"],
+  input[type="url"],
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="week"],
+  textarea,
+  select,
+  .form-control,
+  .form-control:focus,
+  .form-select {
+    background-color: transparent !important;
+    background: transparent !important;
+    color: #fff !important;
+  }
+  
+  // Select dropdown styling - white text in dark mode
+  select,
+  .form-select {
+    color: #ffffff !important;
+    background-color: var(--cui-body-bg, #212529) !important;
+  }
+  
+  // Ensure select dropdown options have dark background in dark mode
+  select option,
+  .form-select option {
+    color: #ffffff !important;
+    background-color: var(--cui-body-bg, #212529) !important;
+  }
+  
+  // Hover state for options (if supported by browser)
+  select option:hover,
+  .form-select option:hover,
+  select option:checked,
+  .form-select option:checked {
+    background-color: var(--cui-primary, #3086FF) !important;
+    color: #ffffff !important;
+  }
+  
+  // Style for when select is focused/open
+  select:focus,
+  .form-select:focus {
+    background-color: var(--cui-body-bg, #212529) !important;
+    border-color: var(--cui-primary, #3086FF) !important;
+  }
+  
+  input::placeholder,
+  textarea::placeholder {
+    color: rgba(255, 255, 255, 0.6) !important;
+    opacity: 1 !important;
+  }
+}

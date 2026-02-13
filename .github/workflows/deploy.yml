@@ -1,0 +1,65 @@
+name: Deployment
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: 'CI: Test & Build'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Frontend - Install & Build
+        run: |
+          cd frontend
+          npm install
+          npm run build
+          # npm test -- --passWithNoTests # Uncomment if you have tests
+
+      - name: Backend - Install & Test
+        run: |
+          cd backend
+          npm install
+          # npm test -- --passWithNoTests # Uncomment if you have tests
+
+  deploy:
+    name: 'CD: Deploy to Server'
+    needs: test
+    runs-on: ubuntu-latest
+    if: success()
+    
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.PORT }}
+          script: |
+            cd /root/outboundAdmin
+            git pull origin main
+            
+            echo "Building Frontend..."
+            cd frontend
+            npm install
+            npm run build
+            
+            echo "Updating Backend..."
+            cd ../backend
+            npm install
+            
+            echo "Restarting Services..."
+            pm2 restart 1
+            systemctl reload nginx
+            echo "Deployment Complete!"
