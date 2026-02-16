@@ -951,12 +951,13 @@ const UsersList = () => {
                     </CFormSelect>
                   </CCol>
                   <CCol md={8}>
-                    <CFormLabel>Phone Number</CFormLabel>
+                    <CFormLabel>Phone Number <span className="text-danger">*</span></CFormLabel>
                     <CFormInput
                       type="tel"
                       placeholder="3001234567"
                       value={createForm.phone}
                       onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
+                      required
                     />
                   </CCol>
                 </CRow>
