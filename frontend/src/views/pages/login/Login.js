@@ -14,7 +14,7 @@ import CIcon from '@coreui/icons-react'
 import { cilLockLocked, cilUser } from '@coreui/icons'
 import { useAuth } from '../../../contexts/AuthContext'
 import logoImage from '../../../assets/logo/DNAI-Logo 1 (1).png'
-import illustrationImage from '../../../assets/images/illustration.png'
+import illustrationImage from '../../../assets/logo/womeniscalling.png'
 
 const Login = () => {
   const [email, setEmail] = useState('')
